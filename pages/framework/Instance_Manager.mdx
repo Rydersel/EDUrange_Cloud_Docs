@@ -1,0 +1,262 @@
+##### The Instance Manager system orchestrates the creation and management of [challenge pods](Challenge-Pod) for users in a Kubernetes cluster. This section overviews the Instance Manager's components and explains how it functions.
+
+> Prerequisites:
+> 1. Basic understanding of [Kubernetes](Introduction_to_Kubernetes)
+> 2. Familiarity with reading [UML Sequence diagrams ](https://www.geeksforgeeks.org/unified-modeling-language-uml-sequence-diagrams/)(Highly Recommended)
+
+# Overview of Components
+
+**1. Flask API (app.py):**
+
+* Provides RESTful endpoints to start and end challenge environments.
+
+* Uses the Kubernetes API to create and manage resources in the cluster.
+
+**2. Ingress Instance Manager (ingress-instance-manager.py):**
+
+* Handles the creation of Kubernetes resources (pods, services, ingress) based on user requests.
+
+* Manages the configuration and deployment of [challenge pods](Challenge-Pod).
+
+**3. YAML Template (challenge-template.yaml):**
+
+* Defines the structure and configuration of the Kubernetes resources needed for a challenge environment.
+
+![Challenge Creation Diagram](https://raw.githubusercontent.com/Rydersel/EDUrange_Cloud/master/assets/Challenge-Creation-Diagram.svg)
+
+__UML Sequence Diagram of challenge creation using the Instance Manager (via Flask API)__
+
+## Flask API (```app.py```)
+The Flask API provides two main endpoints: ```/api/start-challenge``` and ```/api/end-challenge```.
+
+**Endpoints**
+**1. Start Challenge Endpoint** ```POST /api/start-challenge```
+
+**Request Payload:**
+
+```
+{
+  "user_id": "unique_user_identifier",
+  "challenge_image": "docker_image_for_challenge"
+}
+```
+**Response:**
+
+* **Success:** Returns the deployment name and the challenge URL.
+
+* **Error:** Returns an error message and status code 400 if the request payload is missing required keys.
+
+**Functionality:**
+
+* Extracts ```user_id``` and ```challenge_image``` from the request payload.
+
+* Calls ```create_pod_service_and_ingress``` to create the necessary Kubernetes resources.
+
+* Returns the deployment name and challenge URL on success.
+
+Example:
+
+```
+curl -X POST http://<api-url>/api/start-challenge -H "Content-Type: application/json" -d '{"user_id": "user123", "challenge_image": "challenge_image:latest"}'
+```
+
+**End Challenge Checkpoint**
+
+```POST /api/end-challenge```
+
+**Request Payload:**
+
+```
+{ "deployment_name": "name_of_the_deployment" }
+```
+
+**Response:**
+
+* Success: Returns a message indicating the challenge has ended.
+
+* Error: Returns an error message and status code 400 if the request payload is missing required keys.
+
+**Functionality:**
+
+* Extracts ```deployment_name``` from the request payload.
+
+* Calls ```delete_challenge_pod``` to delete the Kubernetes resources associated with the deployment.
+
+Example:
+```
+curl -X POST http://<api-url>/api/end-challenge -H "Content-Type: application/json" -d '{"deployment_name": "ctfchal-user123-1234"}'
+```
+
+## Ingress Instance Manager (```ingress-instance-manager.py```)
+This script contains functions that interact with the Kubernetes API to create and delete resources as needed.
+
+**Key Functions**
+
+1. ```create_pod_service_and_ingress```
+
+* Coordinates the creation of a pod, service, and ingress for a challenge environment.
+
+* Generates a unique instance name and URL for each challenge.
+
+2. ```create_challenge_pod```
+
+* Reads the YAML template file to create Kubernetes resource specifications.
+
+* Customizes the specifications with user-specific information and dynamically sets the challenge image.
+
+* Creates a Kubernetes pod, service, and ingress object.
+
+3. ```delete_challenge_pod```
+
+* Deletes the specified pod, service, and ingress from the Kubernetes cluster.
+
+**Example Workflow**
+
+**1. Creating a Challenge Pod**
+
+**Step 1:** Load Kubernetes configuration.
+
+```
+config.load_incluster_config()
+```
+
+**Step 2:** Generate a unique flag for the user.
+
+```
+flag = generate_unique_flag(user_id)
+```
+
+**Step 3:** Create a Kubernetes secret to store the flag.
+
+```
+secret_name = create_flag_secret(user_id, flag)
+```
+
+**Step 4:** Read and customize the YAML template file (challenge-template.yaml).
+
+```
+documents = read_yaml_file(yaml_path)
+```
+
+**Step 5:** Step 5: Create and deploy the Kubernetes resources.
+
+```
+core_api.create_namespaced_pod(body=pod, namespace="default")
+core_api.create_namespaced_service(namespace="default", body=service)
+networking_v1.create_namespaced_ingress(namespace="default", body=ingress)
+```
+
+**2. Deleting a Challenge Pod**
+
+**Step 1:** Delete the pod.
+
+```
+core_api.delete_namespaced_pod(name=pod_name, namespace="default", body=client.V1DeleteOptions(propagation_policy='Foreground'))
+```
+
+**Step 2:** Delete the service.
+
+```
+core_api.delete_namespaced_service(name=f"service-{pod_name}", namespace="default")
+```
+
+**Step 3:** Delete the ingress.
+
+```
+networking_v1.delete_namespaced_ingress(name=f"ingress-{pod_name}", namespace="default")
+```
+
+## YAML Template (```challenge-template.yaml```)
+
+**Components**
+
+**1. Pod**
+
+* Defines the containers, images, ports, and security context for the challenge environment.
+
+```yaml filename="Deployment"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: challenge-pod
+  labels:
+    app: challenge
+spec:
+  containers:
+  - name: challenge-container
+    image: gcr.io/edurangectf/debiantest  # Gets overwritten anyway
+    ports:
+    - containerPort: 22
+      name: ssh
+    securityContext:
+      runAsUser: 0  # Run as root user
+      privileged: false
+  - name: bridge
+    image: gcr.io/edurangectf/bridge:latest
+    ports:
+    - containerPort: 5000
+      name: http
+    env:
+    - name: CHALLENGE_CONTAINER_NAME
+      value: "challenge-container"
+  - name: webos
+    image: gcr.io/edurangectf/webos
+    ports:
+    - containerPort: 3000
+      name: http
+    env:
+    - name: CHALLENGE_API_URL
+      value: "http://localhost:5000/execute"
+
+```
+
+**2. Service**
+
+* Exposes the application running in the pod to other services within the cluster.Example:
+
+```yaml filename="Service"
+apiVersion: v1
+kind: Service
+metadata:
+  name: challenge-service
+spec:
+  selector:
+    app: challenge
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000  # Expose the WebOS container
+  type: ClusterIP
+```
+
+**3. Ingress**
+
+* Manages external access to the services, typically HTTP.
+
+```yaml filename="Ingress"
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: challenge-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: challenge.rydersel.cloud  # This will be replaced dynamically
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: challenge-service
+            port:
+              number: 80
+```
+
+## Understanding Ingress in Kubernetes
+
+Ingress is a Kubernetes resource that manages external access to services within a cluster (it is basically a reverse proxy but for Kubernetes), typically over HTTP and HTTPS. It acts as an entry point for external traffic, routing it to the appropriate service based on the defined rules. Ingress can handle complex routing configurations, including SSL termination, name-based virtual hosting, and path-based routing, making it a powerful tool for exposing services to the outside world. This allows users to access services using friendly URLs rather than IP addresses and ports.
+
+

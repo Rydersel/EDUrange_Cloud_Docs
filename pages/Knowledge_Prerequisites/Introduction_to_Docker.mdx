@@ -1,0 +1,123 @@
+# What is Docker?
+Docker is a platform for developing, shipping, and running applications inside containers. Containers allow a developer to package up an application with all the parts it needs, such as libraries and other dependencies, and ship it all out as one package. By doing so, the application will run on any other machine regardless of any customized settings that the machine might have that could differ from the machine used for writing and testing the code.
+
+# Benefits of Docker
+**Portability:** Docker containers can run on any system that supports Docker, making it easy to move applications across different environments.
+
+**Consistency:** Ensures that applications run the same way in development, staging, and production environments.
+
+**Isolation:** Containers encapsulate all dependencies, libraries, and configurations needed to run the application, avoiding conflicts between software components.
+
+**Scalability:** Docker makes it simple to scale applications by adding or removing containers dynamically based on demand.
+
+**Efficiency:** Containers are lightweight and share the host system's kernel, making them more efficient than traditional virtual machines.
+
+# Dockerizing an Application
+Dockerizing an application involves creating a Docker image that contains everything needed to run the application. Below are the steps to dockerize a simple Node.js application as an example:
+
+**1. Create a Dockerfile**
+
+A Dockerfile is a script that contains a series of instructions on how to build a Docker image for your application.
+
+```dockerfile filename="dockerfile"
+# Use the official Node.js image from the Docker Hub
+FROM node:14
+
+# Create and set the working directory
+WORKDIR /app
+
+# Copy the package.json and package-lock.json files
+COPY package*.json ./
+
+# Install the dependencies
+RUN npm install
+
+# Copy the rest of the application files
+COPY . .
+
+# Expose the port the application runs on
+EXPOSE 3000
+
+# Command to run the application
+CMD ["node", "app.js"]
+```
+
+**2. Build the Docker Image**
+
+Once the Dockerfile is created, you can build the Docker image using the Docker build command.
+
+```
+docker build -t my-node-app .
+```
+
+This command builds an image named my-node-app based on the instructions in the Dockerfile.
+
+**3. Run the Docker Container**
+
+After building the image, you can run it as a container using the docker run command.
+
+```
+docker run -p 3000:3000 my-node-app
+```
+
+This command runs the container and maps port 3000 of the host to port 3000 of the container.
+
+# Pushing Docker Images to a Repository
+Once you have built your Docker image, you can push it to a Docker registry, such as Docker Hub, to share it with others or deploy it to a production environment.
+
+**1. Log in to Docker Hub**
+
+First, log in to your Docker Hub account.
+
+```
+docker login
+```
+
+You will be prompted to enter your Docker Hub username and password.
+
+**2. Tag the Docker Image**
+
+```
+docker tag my-node-app your-dockerhub-username/my-node-app
+```
+
+**3. Push the Docker Image**
+
+Push the tagged image to Docker Hub.
+
+```
+docker push your-dockerhub-username/my-node-app
+```
+
+This command uploads your image to Docker Hub, making it available in your repository.
+
+**4. Pull the Docker Image**
+
+You can pull the image from Docker Hub to run it on another machine.
+
+```
+docker pull your-dockerhub-username/my-node-app
+```
+
+Then, you can run the pulled image as a container.
+
+```
+docker run -p 3000:3000 your-dockerhub-username/my-node-app
+```
+
+# Conclusion
+Docker is a powerful tool that simplifies the process of developing, shipping, and running applications. By containerizing applications, developers can ensure consistency across different environments, achieve greater portability, and scale their applications efficiently. Dockerizing an application involves creating a Dockerfile, building an image, and running it as a container. Pushing Docker images to a registry like Docker Hub allows for easy sharing and deployment of applications.
+
+This was just a brief overview/refresher on the basics of Docker. If Docker is completely new to you, we recommend taking a look at the following resources:
+
+[Docker Documentation](https://docs.docker.com/) - The official Docker documentation provides comprehensive guides and tutorials to help you get started with Docker.
+
+[Docker Hub](https://hub.docker.com/) - Explore and share container images and find many pre-built images that can help you understand how Docker works.
+
+[Docker for Beginners - A Full Free Course](https://www.youtube.com/watch?v=3c-iBn73dDE) - An in-depth video tutorial that offers a step-by-step guide to learning Docker from scratch.
+
+[Learn Docker in 7 Easy Steps - Full Beginner's Tutorial](https://www.youtube.com/watch?v=gAkwW2tuIqE) - Great tutorial if you do not have time for the entire Docker for Beginners Course
+
+[Play with Docker](https://labs.play-with-docker.com/) - An online playground for Docker where you can experiment with Docker commands and create containers in a matter of minutes.
+
+These resources will provide you with a deeper understanding of Docker and how to use it effectively in your development workflow.
