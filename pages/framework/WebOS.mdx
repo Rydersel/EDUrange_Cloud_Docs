@@ -1,0 +1,327 @@
+
+
+![WebOS](https://raw.githubusercontent.com/Rydersel/EDUrange_Cloud/master/assets/WebOS1.png?width=760)
+
+# Introduction:
+
+EDUrange WebOS is a web application built with Next.js 14, JavaScript, and [Tailwind CSS](https://tailwindcss.com/). It is designed to mimic the look and feel of operating systems like Ubuntu and macOS. This provides users with a familiar and consistent environment to complete challenges. The EDUrange WebOS draws inspiration from outstanding projects such as [OS.js](https://www.os-js.org/) and [Quack OS](https://github.com/jnaraujo/quack-os-react).
+
+## Development Setup:
+
+EDUrange WebOS can be tested and developed locally, completely independent from the rest of the cluster.
+
+**To set up your development environment, follow these steps:**
+
+1.  Clone the Repository:
+
+    ```bash
+    git clone https://github.com/Rydersel/EDUrange_Cloud.git
+    ```
+
+2.  Navigate to the `webos-app` directory:
+
+    ```bash
+    cd EDUrange_cloud/WebOS/webos-app
+    ```
+
+
+3.  Install the Required Packages:
+
+    ```bash
+    npm install
+    ```
+
+
+4.  Start the Next.js App in Development Mode:
+
+    ```bash
+    npm run dev
+    ```
+
+
+You can now access a developer instance of the WebOS at [http://localhost:3000](http://localhost:3000).
+
+**Note:** Many potential errors, specifically related to Next.js Server Side Rendering, do not show up when using `npm run dev`. Make sure to periodically check for these errors by using `npm run build` followed by `npm run start`. This ensures you are aware of any issues that might only occur during the production build process.
+
+
+# Directory Structure:
+
+
+```java
+webos-app/
+├── app/
+│   ├── api/
+│   ├── apps.config.js
+│   ├── globals.css
+│   ├── layout.js
+│   └── page.js
+├── components/
+│   ├── apps/
+│   ├── base/
+│   ├── context menus/
+│   ├── screen/
+│   ├── util-components/
+│   └── webos.js
+└── Dockerfile
+```
+
+### Directory Breakdown
+
+*   **app/**: Contains the main application files and configuration.
+
+    *   **api/**: Houses various API routes include the one for executing commands, essential for interacting with CTF challenges.
+
+    *   **apps.config.js**: Configuration file for the applications in the WebOS (**Detailed Docs Below)**.
+
+    *   **globals.css**: Global CSS styles for the application.
+
+    *   **layout.js**: Defines the layout for the application, including wrappers and providers.
+
+    *   **page.js**: The main entry point for rendering the homepage.
+
+*   **components/**: Contains all the reusable components that make up the WebOS interface.
+
+    *   **apps/**: Components for individual applications like Terminal, Browser, Code Editor, etc.
+
+    *   **base/**: Base components like `BaseApp`, `DockApp`, and `Window` which provide fundamental functionalities (**Detailed Docs Below)**.
+
+    *   **context menus/**: Components for context menus, such as the desktop right-click menu.
+
+    *   **screen/**: Components that make up different parts of the screen interface, including `Desktop`, `Navbar`, and `LockScreen`.
+
+    *   **util-components/**: Utility components providing additional functionalities like `Clock`, `Wallpaper-image`, and `FileSystemView`.
+
+    *   **webos.js**: The main component that orchestrates the primary functionalities of the desktop environment (**Detailed Docs Below)**.
+
+
+
+Main Interface Component (webos.js)
+======================================
+
+The `WebOS` component is the main entry point for the EDUrange WebOS application. It mimics the look and feel of operating systems like Ubuntu and macOS, providing a consistent and familiar environment for users to complete challenges. This component manages the overall state of the WebOS, including screen locking, booting, and background image settings.
+
+#### Purpose in the Larger Scheme
+
+In the larger scheme of the EDUrange WebOS application, the `WebOS` component orchestrates the primary functionalities of the desktop environment. It ensures that the user experience is cohesive and consistent by managing the state transitions between different screens (e.g., booting screen, lock screen, desktop). It also handles user interactions with the system's core features, such as locking/unlocking the screen and changing the background image.
+
+#### Key Functionalities
+
+*   **Screen State Management:**
+
+    *   `screen_locked`: Boolean state to determine if the screen is locked.
+
+    *   `booting_screen`: Boolean state to control the visibility of the booting screen.
+
+    *   `shutDownScreen`: Boolean state to control the shutdown screen visibility.
+
+*   **Lifecycle Methods:**
+
+    *   `componentDidMount`: Retrieves local data from `localStorage` to restore the previous state and settings.
+
+*   **State Management Methods:**
+
+    *   `setTimeOutBootScreen`: Sets a timeout to hide the booting screen after 2 seconds.
+
+    *   `getLocalData`: Retrieves and sets various states (background image, booting screen, shutdown state, screen lock state) from `localStorage`.
+
+*   **Screen Locking Methods:**
+
+    *   `lockScreen`: Locks the screen and updates the state and `localStorage`.
+
+    *   `unLockScreen`: Unlocks the screen and updates the state and `localStorage`.
+
+*   **Background Image Methods:**
+
+    *   `changeBackgroundImage`: Changes the desktop background image and updates `localStorage`.
+
+*   **Shutdown Methods:**
+
+    *   `shutDown`: Activates the shutdown screen and updates the state and `localStorage`.
+
+    *   `turnOn`: Deactivates the shutdown screen and re-enables the booting screen, updating the state and `localStorage`.
+
+
+#### Component Composition
+
+The main `WebOS` component is composed of several subcomponents that handle specific parts of the user interface:
+
+*   **LockScreen:**
+
+    *   Manages the locked state of the screen.
+
+    *   Props:
+
+        *   `isLocked`: Boolean indicating if the screen is locked.
+
+        *   `bgImgName`: The name of the background image.
+
+        *   `unLockScreen`: Function to unlock the screen.
+
+*   **BootingScreen:**
+
+    *   Displays the booting animation.
+
+    *   Props:
+
+        *   `visible`: Boolean indicating if the booting screen is visible.
+
+        *   `isShutDown`: Boolean indicating if the system is shut down.
+
+        *   `turnOn`: Function to turn on the system from the shutdown state.
+
+*   **Navbar:**
+
+    *   Provides navigation and control options such as locking the screen and shutting down.
+
+    *   Props:
+
+        *   `lockScreen`: Function to lock the screen.
+
+        *   `shutDown`: Function to shut down the system.
+
+*   **Desktop:**
+
+    *   Represents the main desktop interface.
+
+    *   Props:
+
+        *   `bg_image_name`: The name of the background image.
+
+        *   `changeBackgroundImage`: Function to change the background image.
+
+
+Core Application Components (components/base)
+=============================================
+
+#### Window Component (Window.js)
+
+The `Window` component is a draggable and resizable window interface used as the base for all applications in the WebOS. It handles various window state changes such as maximizing, minimizing, closing, resizing, and focusing.
+
+**Key Methods and Properties:**
+
+*   **Constructor & State:**
+
+    *   Initializes state properties like `width`, `height`, `maximized`, and `closed`.
+
+*   **Component Lifecycle:**
+
+    *   `componentDidMount`: Sets the default window dimensions based on app configuration or screen size and adds a resize event listener.
+
+    *   `componentWillUnmount`: Sends a page view to Google Analytics and removes the resize event listener.
+
+*   **Window Dimension Management:**
+
+    *   `setDefaultWindowDimension`: Sets default dimensions.
+
+    *   `resizeBoundaries`: Updates the window's boundaries based on screen size.
+
+*   **Cursor and Resize Handlers:**
+
+    *   `changeCursorToMove` and `changeCursorToDefault`: Manage cursor type during dragging.
+
+    *   `handleVerticalResize` and `handleHorizontalResize`: Adjust window dimensions.
+
+*   **Window Positioning:**
+
+    *   `setWindowPosition`: Updates window's CSS properties for positioning.
+
+    *   `checkOverlap`: Checks and hides dock if the window overlaps.
+
+*   **Window State Management:**
+
+    *   `focusWindow`: Brings the window to the front.
+
+    *   `minimizeWindow`: Moves the window to the dock's position.
+
+    *   `restoreWindow`: Restores the window from maximized state.
+
+    *   `maximizeWindow`: Maximizes the window to fill the screen.
+
+    *   `closeWindow`: Closes the window and triggers a callback.
+
+*   **Render Method:**
+
+    *   Uses `Draggable` for drag functionality.
+
+    *   Includes nested components: `WindowTopBar`, `WindowEditButtons`, and `WindowMainScreen`.
+
+
+#### Base\_App Component (base\_app.js)
+
+The `BaseApp` component represents an application icon in the WebOS. It provides functionality to open the application.
+
+**Key Methods and Properties:**
+
+*   **openApp Method:**
+
+    *   Invokes the `openApp` method passed via props with the app's ID to launch the application.
+
+*   **Render Method:**
+
+    *   Displays the app icon and name.
+
+    *   Adds double-click event listener to open the app.
+
+
+#### Dock\_App Component (dock\_app.js)
+
+The `DockApp` component represents an application in the dock, allowing users to open, minimize, or focus the application.
+
+**Key Methods and Properties:**
+
+*   **Constructor & State:**
+
+    *   Initializes state properties like `showTitle` and `scaleImage`.
+
+*   **Component Lifecycle:**
+
+    *   `componentDidMount`: Sets the app ID.
+
+*   **Event Handlers:**
+
+    *   `scaleImage`: Animates the app icon when clicked.
+
+    *   `openApp`: Opens the app, scales the icon, and manages focus state.
+
+*   **Render Method:**
+
+    *   Displays the app icon in the dock.
+
+    *   Shows the app title on hover.
+
+    *   Indicates if the app is minimized or focused.
+
+
+App Configuration (apps.config.js)
+----------------------------------
+
+The `apps.config.js` file is a configuration file that defines the applications available in the WebOS. Each application is represented as an object within an array, specifying various properties and settings that control its behavior and appearance within the operating system.
+
+### Structure
+
+The file imports necessary components for each application and exports a default array `apps`, where each object in the array represents an individual application.
+
+### Application Configuration Properties
+
+Each application object includes the following properties:
+
+*   **id**: A unique identifier for the application.
+
+*   **title**: The display name of the application.
+
+*   **icon**: The path to the application's icon image.
+
+*   **disabled**: A boolean indicating whether the application is disabled.
+
+*   **favourite**: A boolean indicating whether the application is marked as a favorite.
+
+*   **desktop\_shortcut**: A boolean indicating whether the application should have a shortcut on the desktop.
+
+*   **screen**: The component to be rendered when the application is opened.
+
+*   **width**: The default width of the application window as a percentage of the screen width.
+
+*   **height**: The default height of the application window as a percentage of the screen height.
+
+*   **disableScrolling**: (Optional) A boolean indicating whether scrolling should be disabled for the application window.
+

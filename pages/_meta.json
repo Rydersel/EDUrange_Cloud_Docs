@@ -1,7 +1,6 @@
 {
   "index": "Introduction",
-  "another": "Another Page",
-  "advanced": "Advanced (A Folder)",
+  "Knowledge_Prerequisites": "Knowledge Prerequisites",
   "about": {
     "title": "About",
     "type": "page"
@@ -9,7 +8,7 @@
   "contact": {
     "title": "Contact ↗",
     "type": "page",
-    "href": "https://twitter.com/shuding_",
+    "href": "https://github.com/Rydersel/EDUrange_Cloud",
     "newWindow": true
   }
 }
