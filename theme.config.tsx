@@ -9,7 +9,7 @@ const config: DocsThemeConfig = {
   chat: {
     link: 'https://discord.com',
   },
-  docsRepositoryBase: 'https://github.com/shuding/nextra-docs-template',
+  docsRepositoryBase: 'https://github.com/Rydersel/EDUrange_Cloud_Docs/tree/main',
   footer: {
     text: 'EDURange Cloud Docs',
   },
