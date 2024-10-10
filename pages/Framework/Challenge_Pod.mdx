@@ -9,7 +9,7 @@ The challenge pod is dynamically created and deleted by the [Instance Manager ](
 **2. WebOS:** A Next.js web app that simulates the look of an operating system. Users interact with the challenge through this interface, specifically using the terminal app.
 
 **3. Bridge:** A Flask app that connects to the Challenge OS container via a WebSocket and facilitates command execution from the WebOS to the Challenge OS.
-
+<br />
 # Challenge OS
 
 The Challenge OS container is the main environment where the actual challenge runs. This container can run any operating system or software stack depending on the type of challenge. It could be a Debian-based system, a web server, a Python environment, or any other setup required for the challenge. The environment is isolated and secure, ensuring that users can only interact with it through the WebOS terminal.
@@ -40,6 +40,7 @@ RUN apt-get update && \
     curl \
     wget \
     vim \
+
     git \
     sudo && \
     apt-get clean && \
@@ -76,6 +77,7 @@ unset FLAG
 # Start a shell
 exec /bin/bash
 ```
+<br />
 
 # Bridge
 
@@ -92,6 +94,7 @@ The Bridge container acts as an intermediary between the WebOS and Challenge OS.
 
 ![Command Execution](https://raw.githubusercontent.com/Rydersel/EDUrange_Cloud/master/assets/Execution-Diagram.svg)
 
+<br />
 
 # WebOS
 The WebOS container runs a Next.js application that provides a graphical interface simulating an operating system. Users interact with the challenge throught this simulated OS. The WebOS communicates with the challenge OS by sending commands to the Bridge container, which then executes these commands in the Challenge OS environment.
