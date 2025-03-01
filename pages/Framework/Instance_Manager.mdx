@@ -182,17 +182,21 @@ metadata:
   labels:
     app: challenge
 spec:
+  serviceAccountName: terminal-account  # Service account for terminal access
   containers:
   - name: challenge-container
-    image: gcr.io/edurangectf/debiantest  # Gets overwritten anyway
+    image: registry.rydersel.cloud/debiantest  # Gets overwritten dynamically
     ports:
     - containerPort: 22
       name: ssh
     securityContext:
       runAsUser: 0  # Run as root user
       privileged: false
+    env:
+    - name: FLAG
+      value: "flag"  # Gets overwritten with a unique flag
   - name: bridge
-    image: gcr.io/edurangectf/bridge:latest
+    image: registry.rydersel.cloud/bridge
     ports:
     - containerPort: 5000
       name: http
@@ -200,19 +204,44 @@ spec:
     - name: CHALLENGE_CONTAINER_NAME
       value: "challenge-container"
   - name: webos
-    image: gcr.io/edurangectf/webos
+    image: registry.rydersel.cloud/webos
     ports:
     - containerPort: 3000
-      name: http
+      name: webos-http
     env:
-    - name: CHALLENGE_API_URL
+    - name: NEXT_PUBLIC_POD_NAME
+      value: "$(POD_NAME)"
+    - name: NEXT_PUBLIC_APPS_CONFIG
+      value: "$(NEXT_PUBLIC_APPS_CONFIG)"
+    - name: NEXT_PUBLIC_CHALLENGE_POD_NAME
+      value: "$(POD_NAME)"
+    - name: NEXT_PUBLIC_CHALLENGE_API_URL
       value: "http://localhost:5000/execute"
-
+    - name: NEXT_PUBLIC_TERMINAL_URL
+      value: "https://terminal-$(POD_NAME).$(INGRESS_URL)"
+    - name: NEXT_PUBLIC_CHALLENGE_URL
+      value: "https://$(POD_NAME).$(INGRESS_URL)"
+  - name: terminal
+    image: registry.rydersel.cloud/terminal
+    ports:
+    - containerPort: 3001
+      name: terminal-http
+    env:
+    - name: CONTAINER_NAME
+      value: "challenge-container"
+    - name: POD_NAME
+      value: "instance-name"  # Gets overwritten with actual pod name
+    - name: KUBERNETES_HOST
+      value: "kubernetes-api-server"  # Gets overwritten with actual K8s host
+    - name: KUBERNETES_NAMESPACE
+      value: "default"
+    - name: KUBERNETES_SERVICE_ACCOUNT_TOKEN
+      value: "service-account-token"  # Gets overwritten with actual token
 ```
 
 **2. Service**
 
-* Exposes the application running in the pod to other services within the cluster.Example:
+* Exposes the application running in the pod to other services within the cluster.
 
 ```yaml filename="Service"
 apiVersion: v1
@@ -226,6 +255,11 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: 3000  # Expose the WebOS container
+    name: webos
+  - protocol: TCP
+    port: 3001
+    targetPort: 3001  # Expose the Terminal container
+    name: terminal
   type: ClusterIP
 ```
 
@@ -253,10 +287,57 @@ spec:
             name: challenge-service
             port:
               number: 80
+  - host: terminal-challenge.rydersel.cloud  # This will be replaced dynamically
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: challenge-service
+            port:
+              number: 3001
 ```
 
 ## Understanding Ingress in Kubernetes
 
 Ingress is a Kubernetes resource that manages external access to services within a cluster (it is basically a reverse proxy but for Kubernetes), typically over HTTP and HTTPS. It acts as an entry point for external traffic, routing it to the appropriate service based on the defined rules. Ingress can handle complex routing configurations, including SSL termination, name-based virtual hosting, and path-based routing, making it a powerful tool for exposing services to the outside world. This allows users to access services using friendly URLs rather than IP addresses and ports.
+
+## Remote Terminal Integration
+
+The Instance Manager now includes a Remote Terminal container in each challenge pod, which provides a more direct and secure way for users to interact with the Challenge OS container. This replaces the previous approach that relied more heavily on the Bridge component.
+
+**Key Configuration for Remote Terminal:**
+
+1. **Service Account Setup:**
+   - The pod uses a dedicated service account (`terminal-account`) with specific permissions to interact with the Kubernetes API.
+
+2. **Environment Variables:**
+   - The Instance Manager injects several critical environment variables into the Terminal container:
+     ```yaml
+     env:
+     - name: CONTAINER_NAME
+       value: "challenge-container"  # Target container to connect to
+     - name: POD_NAME
+       value: "instance-name"  # Actual pod name
+     - name: KUBERNETES_HOST
+       value: "kubernetes-api-server"  # K8s API server address
+     - name: KUBERNETES_NAMESPACE
+       value: "default"  # Namespace where the pod runs
+     - name: KUBERNETES_SERVICE_ACCOUNT_TOKEN
+       value: "service-account-token"  # Token for API authentication
+     ```
+
+3. **WebOS Integration:**
+   - The WebOS container is configured with the Terminal URL:
+     ```yaml
+     - name: NEXT_PUBLIC_TERMINAL_URL
+       value: "https://terminal-$(POD_NAME).$(INGRESS_URL)"
+     ```
+
+4. **Ingress Configuration:**
+   - A separate ingress rule is created for the Terminal service, allowing direct access via a dedicated URL.
+
+This integration provides a more robust and secure terminal experience, with direct access to the Challenge OS container through the Kubernetes API rather than relying on the Bridge component as an intermediary.
 
 

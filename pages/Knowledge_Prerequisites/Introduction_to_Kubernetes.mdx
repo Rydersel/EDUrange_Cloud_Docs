@@ -1,0 +1,52 @@
+
+> Prerequisites: Basic understanding of [Docker](Introduction_to_Docker)
+
+
+
+# What is Kubernetes?
+[Kubernetes](https://kubernetes.io/) is an open-source container orchestration platform that automates the deployment, scaling, and management of containerized applications. A container is a lightweight, standalone executable package that includes everything needed to run a piece of software, such as code, runtime, libraries, and system tools. Kubernetes groups containers into logical units called "pods" for easy management and discovery.
+
+Kubernetes offers several advantages over traditional architecture. In a traditional setup, applications often run on dedicated servers or virtual machines, which can lead to inefficient resource usage and scaling challenges. Kubernetes, however, abstracts the underlying hardware, allowing containers to be deployed and managed consistently across different environments. It automates many operational tasks, such as load balancing, scaling, and recovery from failures, leading to higher availability and efficient resource utilization. Kubernetes also supports a microservices architecture, where applications are broken down into smaller, independent services that can be developed, deployed, and scaled separately. This results in more modular and maintainable systems.
+
+Kubernetes provides a framework to run distributed systems resiliently. It manages the lifecycle of containers, ensures there is always the desired number of containers running and handles scaling and recovery from failures. This allows developers to focus on building applications without worrying about the underlying infrastructure.
+
+# Using YAML for Deploying Pods
+
+In Kubernetes, YAML (Yet Another Markup Language) files are used to define the desired state of the application's components, such as pods, services, and deployments. A YAML file specifies the configuration for these components, including details like container images, resource requirements, and networking settings. To deploy a pod, you write a YAML configuration file that describes the pod's properties and then apply this file to the Kubernetes cluster using the kubectl apply command. Kubernetes processes the YAML file and ensures that the described pods are created and maintained in the desired state.
+
+Here is a basic example of a YAML file to deploy a pod:
+
+```yaml filename="deployment.yaml"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-pod
+spec:
+  containers:
+  - name: example-container
+    image: nginx:latest
+    ports:
+    - containerPort: 80
+```
+
+In this example:
+
+```apiVersion```: v1 specifies the API version.
+
+```kind```: Pod indicates that the configuration is for a pod.
+
+```metadata``` contains the pod's metadata, including its name (example-pod).
+
+```spec``` defines the specification of the pod.
+
+```containers``` lists the containers within the pod. Here, it specifies one container named ```example-container```.
+
+```image: nginx:latest``` indicates the container image to use.
+
+```ports``` specifies the port mappings, with containerPort: 80 indicating that port 80 in the container will be exposed.
+
+To deploy this pod, save the YAML content to a file (e.g., pod.yaml) and run the following command:
+
+```
+kubectl apply -f deployment.yaml
+```

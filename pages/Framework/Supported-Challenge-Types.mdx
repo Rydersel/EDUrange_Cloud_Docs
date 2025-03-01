@@ -1,0 +1,62 @@
+# Supported Challenge Types
+
+This document outlines the currently supported and planned challenge types in EDUrange Cloud. The platform continues to evolve to support a broader range of educational opportunities beyond traditional CTF competitions.
+
+## Currently Supported Challenge Types
+
+### Full Virtualized OS (Command Shell Access)
+![SUPPORTED](https://img.shields.io/badge/SUPPORTED-28a745)
+
+- **Description**: Provides a complete virtualized operating system environment with command shell access
+- **Use Cases**: File system exploration, command line challenges, basic system administration
+- **Implementation**: Uses a containerized OS (typically Debian-based) with the Remote-Terminal for access
+
+### Web Challenges
+![SUPPORTED](https://img.shields.io/badge/SUPPORTED-28a745)
+
+- **Description**: Web-based challenges focusing on web application security
+- **Use Cases**: SQL injection, XSS, CSRF, and other web vulnerabilities
+- **Implementation**: Uses containerized web servers with vulnerable applications
+
+### Attack/Defend
+![SUPPORTED](https://img.shields.io/badge/SUPPORTED-28a745)
+
+- **Description**: Challenges where users must both attack a vulnerable system and defend their own
+- **Use Cases**: Network security, penetration testing, system hardening
+- **Implementation**: Uses multiple containers (attack and defense) with Metasploit integration
+
+## In Development
+
+### Jailed Virtualized OS (Command Shell Access)
+![IN DEVELOPMENT](https://img.shields.io/badge/IN%20DEVELOPMENT-ffeb3b)
+
+- **Description**: Restricted virtualized environment with limited command access
+- **Use Cases**: Privilege escalation, container escape challenges
+- **Implementation**: Uses containerized OS with restricted permissions and escape monitoring
+
+### Reverse Engineering Challenges
+![IN DEVELOPMENT](https://img.shields.io/badge/IN%20DEVELOPMENT-ffeb3b)
+
+- **Description**: Challenges focused on binary analysis and reverse engineering
+- **Use Cases**: Binary exploitation, malware analysis, code understanding
+- **Implementation**: Uses specialized containers with binary analysis tools and target binaries
+
+## Planned Future Additions
+
+### Packet Analysis (Via CloudShark)
+![PLANNED](https://img.shields.io/badge/PLANNED-9c27b0)
+
+- **Description**: Network packet capture and analysis challenges
+- **Use Cases**: Network forensics, protocol analysis, traffic monitoring
+- **Implementation**: Will integrate with CloudShark for web-based packet analysis
+
+### Cryptography Challenges
+![PLANNED](https://img.shields.io/badge/PLANNED-9c27b0)
+
+- **Description**: Challenges focused on cryptographic concepts and techniques
+- **Use Cases**: Encryption/decryption, hash cracking, cryptanalysis
+- **Implementation**: Will use specialized containers with cryptographic tools and challenges
+
+## Custom Challenge Types
+
+EDUrange Cloud's modular architecture allows for the creation of custom challenge types. Users can develop their own challenge containers and integrate them with the platform. For more information on creating custom challenges, see the [Modules](Modules) documentation.

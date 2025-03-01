@@ -2,13 +2,33 @@
 
 The challenge pod is a key component in the [Instance Manager](Instance-Manager) system, responsible for providing an isolated environment where users can interact with and solve challenges. This documentation outlines the structure and functionality of the challenge pod.
 
-The challenge pod is dynamically created and deleted by the [Instance Manager ](Instance-Manager) in a Kubernetes cluster. It consists of three containers:
+```mermaid
+
+graph LR
+    subgraph "Challenge Pod"
+        WebOS["WebOS Container<br/>(Next.js App)"]
+        RT["Remote-Terminal<br/>(Node.js App)"]
+        Bridge["Bridge Container<br/>(Flask App)<br/><i>Being phased out</i>"]
+        ChallengeOS["Challenge OS Container<br/>(Challenge Environment)"]
+    end
+
+    User["User Browser"] --> WebOS
+    WebOS --> RT
+    RT -->|"Kubernetes API"| ChallengeOS
+    WebOS -.->|"Legacy Path"| Bridge
+    Bridge -.->|"Direct Connection"| ChallengeOS
+
+```
+
+The challenge pod is dynamically created and deleted by the [Instance Manager ](Instance-Manager) in a Kubernetes cluster. It consists of four containers:
 
 **1. Challenge OS:** The environment where the actual challenge exists.
 
 **2. WebOS:** A Next.js web app that simulates the look of an operating system. Users interact with the challenge through this interface, specifically using the terminal app.
 
-**3. Bridge:** A Flask app that connects to the Challenge OS container via a WebSocket and facilitates command execution from the WebOS to the Challenge OS.
+**3. Bridge:** A Flask app that connects to the Challenge OS container and facilitates command execution from the WebOS to the Challenge OS. This component is being phased out in favor of the Remote-Terminal for direct command execution.
+
+**4. Remote-Terminal:** A Node.js application that provides a web-based terminal interface with direct access to the Challenge OS container via the Kubernetes API.
 
 # Challenge OS
 
@@ -81,6 +101,7 @@ exec /bin/bash
 
 The Bridge container acts as an intermediary between the WebOS and Challenge OS. It is a Python Flask application that maintains a WebSocket connection to receive commands from the WebOS and executes them in the Challenge OS.
 
+**Note:** The Bridge component is being phased out in favor of the Remote-Terminal component for direct command execution. It is still included in the pod for backward compatibility and for specific use cases where direct API access is not preferred.
 
 **Key Functionality:**
 
@@ -88,20 +109,31 @@ The Bridge container acts as an intermediary between the WebOS and Challenge OS.
 
 * **WebSocket Communication:** Handles real-time communication between the WebOS and the Challenge OS.
 
-**Below is a UML sequence diagram of the process of executing commands:**
+# Remote-Terminal
 
-![Command Execution](https://raw.githubusercontent.com/Rydersel/EDUrange_Cloud/master/assets/Execution-Diagram.svg)
-
-
-# WebOS
-The WebOS container runs a Next.js application that provides a graphical interface simulating an operating system. Users interact with the challenge throught this simulated OS. The WebOS communicates with the challenge OS by sending commands to the Bridge container, which then executes these commands in the Challenge OS environment.
-
+The Remote-Terminal container is a newer addition to the challenge pod that provides a more direct and secure way for users to interact with the Challenge OS. It is a Node.js application that uses the Kubernetes API to execute commands directly in the Challenge OS container.
 
 **Key Functionality:**
 
-**Terminal Interaction:** Users type commands into the terminal app, which are sent to the Bridge container for execution. The terminal app provides a command-line interface (CLI) similar to what users would find on a real operating system.
+* **Direct Command Execution:** Uses the Kubernetes API to execute commands directly in the Challenge OS container without requiring an intermediary service.
+
+* **WebSocket Communication:** Maintains a WebSocket connection with the browser for real-time command execution and output display.
+
+* **Rich Terminal Experience:** Provides a feature-rich terminal interface with support for copy/paste, font size adjustment, and other terminal features.
+
+* **Secure Access Control:** Uses Kubernetes RBAC (Role-Based Access Control) to ensure secure access to the Challenge OS container.
+
+
+# WebOS
+
+The WebOS container runs a Next.js application that provides a graphical interface simulating an operating system. Users interact with the challenge through this simulated OS. The WebOS includes a Terminal application that embeds the Remote-Terminal interface, allowing users to interact with the Challenge OS container.
+
+**Key Functionality:**
+
+**Terminal Interaction:** Users access the terminal app in the WebOS, which loads the Remote-Terminal interface. This interface connects directly to the Challenge OS container via the Kubernetes API, providing a seamless command-line experience.
 
 **Graphical Interface:** Simulates an operating system with various applications. This enhances user experience by providing a familiar environment for interacting with the challenges.
 
-
 >Detailed documentation for the WebOS can be found [here](WebOS)
+
+>Detailed documentation for the Remote-Terminal can be found [here](Terminal)

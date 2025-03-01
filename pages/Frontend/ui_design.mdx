@@ -1,0 +1,361 @@
+# UI Design System
+
+## Overview
+
+The EDURange Cloud dashboard uses a modern UI design system built with:
+
+- [Next.js](https://nextjs.org/) for the React framework
+- [Tailwind CSS](https://tailwindcss.com/) for styling
+- [shadcn/ui](https://ui.shadcn.com/) for component primitives
+- [Radix UI](https://www.radix-ui.com/) for accessible component foundations
+
+This documentation provides guidelines for creating new UI components that match the existing design system, ensuring a consistent user experience throughout the application.
+
+## Color Scheme
+
+EDURange Cloud uses a custom color palette with a focus on green tones for the light theme and dark purple tones for the dark theme. The color system is implemented using CSS variables and Tailwind CSS.
+
+### Primary Colors
+
+The EDURange-specific colors are defined in the Tailwind configuration:
+
+```javascript
+edurange: {
+  background: '#1E0836',  // Deep purple background (dark mode)
+  card: '#2D0F4C',        // Card background (dark mode)
+  cardHeader: '#3A1466',  // Card header background (dark mode)
+  accent: '#B388FF',      // Accent color (purple)
+}
+```
+
+### Theme Colors
+
+The application uses CSS variables to define theme colors in `globals.css`:
+
+#### Light Theme (Temporary)
+
+```css
+:root {
+  --background: 143.8 54% 95%;        /* Light green-gray */
+  --foreground: 143.8 5% 7%;          /* Near black */
+  --card: 143.8 50% 90%;              /* Light green-gray for cards */
+  --card-foreground: 143.8 5% 10%;    /* Dark text on cards */
+  --popover: 143.8 54% 95%;           /* Same as background */
+  --popover-foreground: 143.8 95% 7%; /* Same as foreground */
+  --primary: 143.8 61.2% 20.2%;       /* Green */
+  --primary-foreground: 0 0% 100%;    /* White */
+  --secondary: 143.8 30% 70%;         /* Light green */
+  --secondary-foreground: 0 0% 0%;    /* Black */
+  --muted: 105.8 30% 85%;             /* Muted green */
+  --muted-foreground: 143.8 5% 35%;   /* Muted text */
+  --accent: 105.8 30% 80%;            /* Accent green */
+  --accent-foreground: 143.8 5% 10%;  /* Dark text on accent */
+  --destructive: 0 54% 30%;           /* Red */
+  --destructive-foreground: 143.8 5% 90%; /* Light text on destructive */
+  --border: 143.8 30% 50%;            /* Border color */
+  --input: 143.8 30% 18%;             /* Input border */
+  --ring: 143.8 61.2% 20.2%;          /* Focus ring (same as primary) */
+  --radius: 0.5rem;                   /* Border radius */
+}
+```
+
+#### Dark Theme
+
+```css
+.dark {
+  --background: 143.8 50% 3%;         /* Very dark green */
+  --foreground: 143.8 5% 90%;         /* Light text */
+  --card: 143.8 50% 5%;               /* Dark card background */
+  --card-foreground: 143.8 5% 90%;    /* Light text on cards */
+  --popover: 143.8 50% 5%;            /* Same as card */
+  --popover-foreground: 143.8 5% 90%; /* Same as card-foreground */
+  --primary: 143.8 61.2% 20.2%;       /* Green (same as light theme) */
+  --primary-foreground: 0 0% 100%;    /* White */
+  --secondary: 143.8 30% 10%;         /* Dark green */
+  --secondary-foreground: 0 0% 100%;  /* White */
+  --muted: 105.8 30% 15%;             /* Muted dark green */
+  --muted-foreground: 143.8 5% 60%;   /* Muted light text */
+  --accent: 105.8 30% 15%;            /* Accent dark green */
+  --accent-foreground: 143.8 5% 90%;  /* Light text on accent */
+  --destructive: 0 54% 30%;           /* Red (same as light theme) */
+  --destructive-foreground: 143.8 5% 90%; /* Light text on destructive */
+  --border: 143.8 30% 15%;            /* Dark border */
+  --input: 143.8 30% 18%;             /* Input border (same as light theme) */
+  --ring: 143.8 61.2% 20.2%;          /* Focus ring (same as primary) */
+  --radius: 0.5rem;                   /* Border radius */
+}
+```
+
+### Using Colors in Components
+
+When creating new components, use the semantic color variables rather than hard-coded colors:
+
+```tsx
+// Good - uses semantic color variables
+<div className="bg-background text-foreground">
+  <h2 className="text-primary">Heading</h2>
+  <p className="text-muted-foreground">Muted text</p>
+</div>
+
+// Avoid - hard-coded colors
+<div className="bg-white text-black">
+  <h2 className="text-green-700">Heading</h2>
+  <p className="text-gray-500">Muted text</p>
+</div>
+```
+
+## Typography
+
+EDURange Cloud uses a consistent typography system:
+
+### Font Family
+
+The application uses the default system font stack provided by Tailwind CSS.
+
+### Font Sizes
+
+Follow these guidelines for font sizes:
+
+- Headings:
+  - h1: `text-3xl font-bold`
+  - h2: `text-2xl font-semibold`
+  - h3: `text-xl font-semibold`
+  - h4: `text-lg font-medium`
+- Body text: `text-base`
+- Small text: `text-sm`
+- Extra small text: `text-xs`
+
+### Font Weights
+
+- Bold: `font-bold`
+- Semibold: `font-semibold`
+- Medium: `font-medium`
+- Regular: `font-normal`
+- Light: `font-light`
+
+
+## Frequently Used Components
+
+EDURange Cloud has several custom components that are frequently used throughout the application. When building new features, consider using these components for consistency.
+
+### DataTable
+
+The `DataTable` component provides a standardized way to display tabular data with search functionality:
+
+```tsx
+import { DataTable } from '@/components/ui/data-table';
+
+// Define columns
+const columns = [
+  {
+    accessorKey: 'name',
+    header: 'Name',
+  },
+  {
+    accessorKey: 'status',
+    header: 'Status',
+  },
+];
+
+// Usage
+<DataTable
+  columns={columns}
+  data={data}
+  searchKey="name"
+  onRowClick={(row) => handleRowClick(row)}
+/>
+```
+
+**Props:**
+- `columns`: Column definitions for the table
+- `data`: Array of data objects
+- `searchKey`: The key to search on
+- `onRowClick`: Optional callback for row click events
+
+**File Path:** `dashboard/components/ui/data-table.tsx`
+
+**Props:**
+- `title`: Card title (string)
+- `status`: Health status ('healthy', 'warning', or 'error')
+- `icon`: Lucide icon component
+- `details`: Array of label-value pairs to display
+
+**File Path:** `dashboard/components/dashboard/system-health-card.tsx`
+
+### SearchAndFilters
+
+The `SearchAndFilters` component provides a standardized search bar with dropdown filters:
+
+```tsx
+import { SearchAndFilters } from '@/components/challenges/search-and-filters';
+
+// Usage
+<SearchAndFilters
+  searchQuery={searchQuery}
+  setSearchQuery={setSearchQuery}
+  selectedDifficulty={selectedDifficulty}
+  setSelectedDifficulty={setSelectedDifficulty}
+  selectedCategory={selectedCategory}
+  setSelectedCategory={setSelectedCategory}
+  sortByDifficulty={sortByDifficulty}
+/>
+```
+
+**Props:**
+- `searchQuery`: Current search query (string)
+- `setSearchQuery`: Function to update search query
+- `selectedDifficulty`: Current difficulty filter (string)
+- `setSelectedDifficulty`: Function to update difficulty filter
+- `selectedCategory`: Current category filter (string)
+- `setSelectedCategory`: Function to update category filter
+- `sortByDifficulty`: Sort direction for difficulty ('asc', 'desc', or null)
+
+**File Path:** `dashboard/components/challenges/search-and-filters.tsx`
+
+### Breadcrumbs
+
+The `Breadcrumbs` component provides a navigation trail showing the user's current location in the application hierarchy:
+
+```tsx
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+
+// Usage
+<Breadcrumbs
+  items={[
+    { title: 'Dashboard', href: '/dashboard' },
+    { title: 'Challenges', href: '/dashboard/challenges' },
+    { title: 'Challenge Details', href: '/dashboard/challenges/123', active: true }
+  ]}
+/>
+```
+
+**Props:**
+- `items`: Array of breadcrumb items with the following properties:
+  - `title`: Display text for the breadcrumb (string)
+  - `href`: Link destination (string)
+  - `active`: Whether this is the current page (boolean, optional)
+- `separator`: Custom separator element (React node, optional, defaults to "/")
+- `className`: Additional CSS classes (string, optional)
+
+The component automatically styles the active item differently and makes all items except the active one clickable.
+
+**File Path:** `dashboard/components/ui/breadcrumbs.tsx`
+
+### ConfirmationDialog
+
+The `ConfirmationDialog` component provides a standardized way to ask for user confirmation before performing destructive or important actions:
+
+```tsx
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { useState } from 'react';
+
+// Usage
+const [open, setOpen] = useState(false);
+
+<ConfirmationDialog
+  open={open}
+  onOpenChange={setOpen}
+  title="Delete Challenge"
+  description="Are you sure you want to delete this challenge? This action cannot be undone."
+  confirmText="Delete"
+  cancelText="Cancel"
+  variant="destructive"
+  onConfirm={() => handleDelete(id)}
+/>
+
+// Trigger button
+<Button variant="destructive" onClick={() => setOpen(true)}>
+  Delete Challenge
+</Button>
+```
+
+**Props:**
+- `open`: Whether the dialog is open (boolean)
+- `onOpenChange`: Function to call when open state changes (function)
+- `title`: Dialog title (string)
+- `description`: Dialog description (string)
+- `confirmText`: Text for the confirm button (string, defaults to "Confirm")
+- `cancelText`: Text for the cancel button (string, defaults to "Cancel")
+- `variant`: Button variant for the confirm button (string, defaults to "default")
+- `onConfirm`: Function to call when the user confirms (function)
+- `loading`: Whether the confirmation action is in progress (boolean, optional)
+- `disabled`: Whether the confirmation action is disabled (boolean, optional)
+
+The component handles keyboard navigation (Escape to cancel, Enter to confirm) and focus management automatically.
+
+**File Path:** `dashboard/components/ui/confirmation-dialog.tsx`
+
+### UserNav
+
+The `UserNav` component displays the current user's information with a dropdown menu:
+
+```tsx
+import { UserNav } from '@/components/layout/user-nav';
+
+// Usage
+<UserNav />
+```
+
+This component automatically fetches the current user's session information and displays appropriate menu options based on the user's role.
+
+**File Path:** `dashboard/components/layout/user-nav.tsx`
+
+
+This component automatically adapts to the user's role, showing admin links only for users with ADMIN or INSTRUCTOR roles.
+
+**File Path:** `dashboard/components/layout/main-navigation.tsx`
+
+
+
+## Animations
+
+EDURange Cloud uses several custom animations defined in the Tailwind config:
+
+```tsx
+// Examples of animation usage
+<div className="animate-fade-in">Fades in</div>
+<div className="animate-fade-in-up">Fades in and moves up</div>
+<div className="animate-bounce-x">Bounces horizontally</div>
+<div className="animate-gradient">Gradient animation</div>
+```
+
+## Creating New Components
+
+When creating new components for EDURange Cloud, follow these guidelines:
+
+1. **Use Existing Patterns**: Start by examining similar components in the codebase.
+2. **Follow Component Structure**: Use the forwardRef pattern and proper TypeScript typing.
+3. **Use Semantic Colors**: Leverage the theme color variables.
+5. **Support Dark Mode**: Test components in both light and dark themes.
+6. **Responsive Design**: Ensure components work well on all screen sizes.
+
+
+## Best Practices
+
+### Responsive Design
+
+- Use Tailwind's responsive prefixes (`sm:`, `md:`, `lg:`, `xl:`, `2xl:`) for responsive styles.
+- Design for mobile-first, then add styles for larger screens.
+- Test components at various screen sizes.
+
+### Performance
+
+- Avoid large, unnecessary re-renders.
+- Use `React.memo` for components that don't need to re-render often.
+- Optimize images and animations.
+
+### Code Style
+
+- Use early returns for cleaner code.
+- Use descriptive variable and function names.
+- Prefix event handlers with "handle" (e.g., `handleClick`).
+- Use consts instead of functions when appropriate.
+- Define TypeScript types for props and state.
+
+## Resources
+
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [shadcn/ui Documentation](https://ui.shadcn.com/docs)
+- [Radix UI Documentation](https://www.radix-ui.com/docs/primitives/overview/introduction)
+- [class-variance-authority Documentation](https://cva.style/docs)
+- [Next.js Documentation](https://nextjs.org/docs)

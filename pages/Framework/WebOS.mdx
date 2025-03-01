@@ -325,3 +325,39 @@ Each application object includes the following properties:
 
 *   **disableScrolling**: (Optional) A boolean indicating whether scrolling should be disabled for the application window.
 
+## Terminal Application Integration
+
+The Terminal application in WebOS has been updated to integrate with the Remote-Terminal component instead of relying on the Bridge component. This provides a more direct and secure way for users to interact with the Challenge OS container.
+
+### Terminal Component (terminal.js)
+
+The Terminal component is a simple wrapper that embeds the Remote-Terminal interface using an iframe:
+
+```javascript
+import React from 'react';
+
+export default function Terminal({ id }) {
+    let terminal_url = `https://terminal-${window.location.host}`;
+    console.log(terminal_url);
+    const instanceNumber = id.includes('-') ? id.split('-')[0].match(/\d+/)?.[0] || '' : '';
+    return (
+        <iframe src={terminal_url} frameBorder="0" title={`Terminal ${instanceNumber}`} className="h-full w-full bg-ub-grey"></iframe>
+    );
+}
+```
+
+### Key Features
+
+1. **Direct Connection**: The Terminal component connects directly to the Remote-Terminal service, which has direct access to the Challenge OS container via the Kubernetes API.
+
+2. **Environment Variables**: The WebOS container receives the Terminal URL from the Instance Manager through environment variables:
+   ```
+   NEXT_PUBLIC_TERMINAL_URL=https://terminal-$(POD_NAME).$(INGRESS_URL)
+   ```
+
+3. **Seamless Integration**: The Terminal appears as a native application within the WebOS interface, providing a consistent user experience.
+
+4. **Enhanced Security**: By using the Remote-Terminal component, the WebOS no longer needs to handle command execution directly, improving security isolation between components.
+
+This updated approach simplifies the architecture by removing the need for the WebOS to communicate with the Bridge component for terminal functionality, instead delegating this responsibility to the specialized Remote-Terminal component.
+
