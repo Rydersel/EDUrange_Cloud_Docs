@@ -6,16 +6,12 @@ const page = {
   },
   Installation : 'Installation',
   Contributing : 'Contributing',
-  Framework : 'Framework',
   Frontend : 'Frontend',
+  Framework : 'Framework',
   Database : 'Database',
   Knowledge_Prerequisites : 'Knowledge Prerequisites',
 
 
-  about: {
-    title: "About",
-    type: "page"
-  },
 
 
 }

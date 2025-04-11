@@ -1,0 +1,169 @@
+# Monitoring System
+
+## Overview
+
+The EDURange Cloud Monitoring System provides real-time resource usage metrics and visualization for the platform. It collects data on CPU, memory, network traffic, and challenge pod status, making this information available through both a dedicated API and Prometheus metrics endpoints. This system helps administrators monitor the health and performance of their EDURange Cloud deployment.
+
+## Architecture
+
+The monitoring system consists of several interconnected components:
+
+1. **Monitoring Service**: A dedicated microservice that collects metrics from various sources and exposes them via REST API endpoints.
+2. **Prometheus**: An open-source monitoring and alerting toolkit that stores time-series data.
+3. **Dashboard Integration**: Components in the EDURange dashboard that visualize the collected metrics.
+4. **Kubernetes Integration**: RBAC permissions and service accounts that allow the monitoring service to access cluster metrics.
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│    Dashboard    │◄────┤  Monitoring     │◄────┤   Prometheus    │
+│    (Frontend)   │     │    Service      │     │                 │
+│                 │     │                 │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                              ▲                        ▲
+                              │                        │
+                              │                        │
+                              ▼                        │
+                        ┌─────────────────┐           │
+                        │                 │           │
+                        │   Kubernetes    │───────────┘
+                        │      API        │
+                        │                 │
+                        └─────────────────┘
+```
+
+## Monitoring Service
+
+The monitoring service is a Flask application that collects metrics from multiple sources:
+
+- **Kubernetes API**: For pod and node information
+- **Prometheus**: For network traffic and other system metrics
+- **psutil**: As a fallback for local system metrics when Prometheus data is unavailable
+
+### Key Features
+
+- **Metrics Collection**: Gathers CPU, memory, network, and challenge pod metrics
+- **Caching**: Implements a TTL-based cache to reduce API load
+- **History Tracking**: Maintains a 24-hour history of metrics for trend visualization
+- **Fallback Mechanisms**: Provides reliable data even when primary sources fail
+- **Prometheus Integration**: Exposes collected metrics in Prometheus format
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/metrics/current` | GET | Returns current values for all metrics |
+| `/api/metrics/history` | GET | Returns historical data for specified metric type |
+| `/api/pods` | GET | Returns detailed information about challenge pods |
+| `/api/nodes` | GET | Returns information about cluster nodes |
+| `/health` | GET | Health check endpoint |
+
+## Prometheus Integration
+
+The monitoring service both consumes data from and exposes data to Prometheus:
+
+### Metrics Exposed
+
+- `edurange_cpu_usage_system`: CPU usage by system components (%)
+- `edurange_cpu_usage_challenges`: CPU usage by challenge pods (%)
+- `edurange_cpu_usage_total`: Total CPU usage (%)
+- `edurange_memory_used`: Memory used (%)
+- `edurange_memory_available`: Memory available (%)
+- `edurange_memory_total_bytes`: Total memory (bytes)
+- `edurange_memory_used_bytes`: Used memory (bytes)
+- `edurange_network_inbound`: Network inbound traffic (MB/s)
+- `edurange_network_outbound`: Network outbound traffic (MB/s)
+- `edurange_network_total`: Total network traffic (MB/s)
+- `edurange_challenge_count_total`: Total number of challenge pods
+- `edurange_challenge_count_running`: Number of running challenge pods
+- `edurange_challenge_count_pending`: Number of pending challenge pods
+- `edurange_challenge_count_failed`: Number of failed challenge pods
+
+### Metrics Consumed
+
+- `node_network_receive_bytes_total`: Network receive bytes
+- `node_network_transmit_bytes_total`: Network transmit bytes
+
+## Dashboard Integration
+
+The dashboard integrates with the monitoring service to display resource usage metrics:
+
+- **Resource Usage Charts**: Visualize CPU, memory, network, and challenge pod metrics
+- **Real-time Updates**: Automatically refresh data every minute
+- **Historical View**: Display 24-hour history with time-based navigation
+- **Current Time Indicator**: Show the current position in the timeline
+
+## Installation and Configuration
+
+The monitoring system is installed using the `install-monitoring.sh` script, which:
+
+1. Installs Prometheus and related components in the Kubernetes cluster
+2. Deploys the monitoring service with appropriate RBAC permissions
+3. Configures ServiceMonitor for Prometheus integration
+4. Sets up proper network access between components
+
+### Environment Variables
+
+The monitoring service can be configured using the following environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PROMETHEUS_URL` | URL of the Prometheus server | `http://prometheus-kube-prometheus-prometheus.monitoring:9090` |
+| `METRICS_CACHE_TTL` | Cache time-to-live in seconds | `15` |
+| `METRICS_PORT` | Port for Prometheus metrics endpoint | `9100` |
+| `HISTORY_RETENTION_HOURS` | Hours to retain metrics history | `24` |
+
+## Network Traffic Monitoring
+
+Network traffic monitoring is a critical component that:
+
+1. Queries Prometheus for network interface metrics
+2. Filters out virtual interfaces (lo, veth, docker, etc.)
+3. Calculates inbound, outbound, and total traffic rates
+4. Falls back to psutil for direct system metrics if Prometheus is unavailable
+5. Ensures minimum values to maintain dashboard visualization
+
+## Troubleshooting
+
+Common issues and their solutions:
+
+### No Network Traffic Data
+
+- Check if Prometheus is running: `kubectl get pods -n monitoring`
+- Verify ServiceMonitor configuration: `kubectl get servicemonitor -n monitoring`
+- Check monitoring service logs: `kubectl logs -l app=monitoring-service`
+- Ensure node-exporter is collecting network metrics: `kubectl get pods -n monitoring | grep node-exporter`
+
+### Missing or Incomplete Metrics
+
+- Verify RBAC permissions for the monitoring service
+- Check if the monitoring service can access the Kubernetes API
+- Ensure Prometheus is scraping the monitoring service endpoints
+- Check for errors in the monitoring service logs
+
+### Dashboard Not Showing Metrics
+
+- Verify the monitoring service is running
+- Check if the dashboard can reach the monitoring service API
+- Inspect browser network requests for API errors
+- Ensure the correct environment variables are set in the dashboard configuration
+
+## Security Considerations
+
+The monitoring system is designed with security in mind:
+
+- Uses dedicated service accounts with minimal permissions
+- Implements proper RBAC for Kubernetes API access
+- Exposes metrics only on internal cluster networks
+- Validates and sanitizes all input data
+- Implements rate limiting to prevent abuse
+
+## Future Enhancements
+
+Planned improvements to the monitoring system:
+
+- **Alerting**: Integration with alert managers for proactive notification
+- **Custom Metrics**: Support for user-defined metrics
+- **Extended History**: Longer retention periods for historical data
+- **Grafana Dashboards**: Pre-configured dashboards for detailed analysis
+- **Resource Prediction**: ML-based prediction of resource usage trends 

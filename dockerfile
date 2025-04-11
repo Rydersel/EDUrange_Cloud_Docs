@@ -1,4 +1,4 @@
-# docker buildx build --platform linux/amd64 -t registry.rydersel.cloud/docs . --push
+# docker buildx build --platform linux/amd64 -t registry.edurange.cloud/edurange/docs . --push
 
 FROM node:18.18.0
 

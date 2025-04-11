@@ -2,32 +2,32 @@
 
 ## Overview
 
-The EDUrange Cloud dashboard uses [NextAuth.js](https://next-auth.js.org/) (now known as Auth.js) as its authentication library. NextAuth.js is a complete open-source authentication solution for Next.js applications that supports various authentication methods including OAuth providers, email/password, and more.
+The EDURange Cloud dashboard uses [NextAuth.js](https://next-auth.js.org/) (now known as Auth.js) as its authentication library. NextAuth.js is a complete open-source authentication solution for Next.js applications that supports various authentication methods including OAuth providers, email/password, and more.
 
-The authentication system in EDUrange Cloud provides:
+The authentication system in EDURange Cloud provides:
 
 - Secure user authentication with GitHub OAuth
-- Session management using database strategy
+- Session management using JWT strategy
+- Development login for testing with multiple user roles
 - Role-based access control (STUDENT, INSTRUCTOR, ADMIN)
-- Integration with the [Prisma database adapter](../Database/database_controller.md)
-- [Activity logging](./activity_logging.mdx) for authentication events
+- Integration with the [Prisma database adapter](../Database/structure)
+- [Activity logging](./activity_logging) for authentication events
 
-While the platform currently only supports GitHub OAuth, there are plans to add additional OAuth providers in the future to give users more sign-in options.
+While the platform primarily uses GitHub OAuth for production, it also includes a development login feature for testing with different user roles.
 
 ## Authentication Strategy
 
-EDUrange Cloud exclusively uses OAuth providers for authentication rather than traditional email/password authentication. This strategic decision was made for several important reasons:
+EDURange Cloud uses two authentication strategies:
 
-1. **Security**: By using OAuth, we avoid the security risks associated with storing and managing password information. This eliminates concerns about password hashing, storage, and potential data breaches.
+1. **OAuth Authentication**: For production use, we use GitHub OAuth provider for authentication rather than traditional email/password authentication. This strategic decision was made for several important reasons:
 
-2. **Reduced Development Overhead**: OAuth providers handle the complex security aspects of authentication, allowing our team to focus on building core platform features.
+   - **Security**: By using OAuth, we avoid the security risks associated with storing and managing password information.
+   - **Reduced Development Overhead**: OAuth providers handle the complex security aspects of authentication.
+   - **Modern User Experience**: OAuth provides a streamlined sign-in experience that many users are already familiar with.
+   - **Account Verification**: OAuth providers have already verified user emails and identities.
+   - **Maintenance**: We don't need to implement and maintain password reset flows or account recovery.
 
-3. **Modern User Experience**: OAuth provides a streamlined sign-in experience that many users are already familiar with.
-
-4. **Account Verification**: OAuth providers have already verified user emails and identities, eliminating the need for additional verification steps.
-
-5. **Maintenance**: We don't need to implement and maintain password reset flows, account recovery, or other password-related features.
-
+2. **Development Login**: For development and testing purposes, we provide a credentials-based login that allows creating and logging in as users with different roles. This is only available in development mode and helps with testing role-based functionality without needing multiple GitHub accounts.
 
 ## User Authentication Flow
 
@@ -58,13 +58,13 @@ sequenceDiagram
         EDURange->>DB: Logs USER_LOGGED_IN event
     end
 
-    EDURange->>DB: Creates new session
-    EDURange->>User: Redirects to dashboard with session cookie
+    EDURange->>User: Creates JWT with user data
+    EDURange->>User: Redirects to dashboard with JWT in cookie
     User->>EDURange: Accesses protected routes
-    EDURange->>DB: Validates session on each request
+    EDURange->>User: Validates JWT on each request
     EDURange->>User: Returns authorized content based on role
 
-    Note over User,DB: Session valid for 30 days
+    Note over User,DB: JWT valid for 30 days
 
     alt Session Expiry
         User->>EDURange: Attempts to access after expiry
@@ -77,7 +77,7 @@ This diagram shows the complete authentication journey, including:
 1. Initial sign-in process
 2. OAuth authorization with GitHub
 3. User creation or retrieval
-4. Session management
+4. JWT-based session management
 5. Access to protected resources
 6. Session expiration handling
 
@@ -87,7 +87,7 @@ This diagram shows the complete authentication journey, including:
 
 1. **User Visits Dashboard**: When a user navigates to the EDURange Cloud dashboard, the application checks if they have a valid session.
 
-2. **Sign-in Page Display**: If no valid session exists, the user is redirected to the sign-in page located at `dashboard/app/(auth)/(signin)/page.tsx`.
+2. **Sign-in Page Display**: If no valid session exists, the user is redirected to the sign-in page located at `/signin`.
 
 3. **GitHub Authentication Initiation**: When the user clicks "Continue with GitHub", the application calls `signIn('github')` from NextAuth.js, which initiates the OAuth flow.
 
@@ -110,314 +110,396 @@ This diagram shows the complete authentication journey, including:
 10. **User Determination**: NextAuth.js checks if the user already exists in the database by looking for matching OAuth account records.
 
 11. **New User Creation**: For first-time users, a new user record is created in the database with default role 'STUDENT', and a USER_REGISTERED event is logged.
+
 12. **Existing User Retrieval**: For returning users, their existing record is retrieved, and a USER_LOGGED_IN event is logged.
 
-#### Session Management
+#### Session Management with JWT
 
-13. **Session Creation**: A new session record is created in the database with the user's ID, expiration time, and a session token.
+13. **JWT Creation**: A JWT (JSON Web Token) is created containing the user's ID, role, and other essential information.
 
-14. **Cookie Setting**: The session token is stored in an HTTP-only cookie in the user's browser.
+14. **Cookie Setting**: The JWT is stored in an HTTP-only cookie in the user's browser.
 
-15. **Protected Route Access**: When the user accesses protected routes, the session token from the cookie is used to identify them.
+15. **Protected Route Access**: When the user accesses protected routes, the JWT from the cookie is used to identify them.
 
-16. **Session Validation**: On each request to a protected route, NextAuth.js validates the session token against the database.
+16. **JWT Validation**: On each request to a protected route, NextAuth.js validates the JWT signature and expiration.
 
-17. **Role-Based Content**: Content is served based on the user's role (STUDENT, INSTRUCTOR, or ADMIN) as stored in the session.
+17. **Role-Based Content**: Content is served based on the user's role (STUDENT, INSTRUCTOR, or ADMIN) as stored in the JWT.
 
 #### Session Lifecycle
 
-18. **Session Duration**: Sessions remain valid for 30 days from creation, as configured in `auth.config.ts`.
+18. **Session Duration**: JWTs remain valid for 30 days from creation, as configured in `auth.ts`.
 
-19. **Session Expiry**: When a session expires, any attempt to access protected routes will fail validation.
+19. **Session Expiry**: When a JWT expires, any attempt to access protected routes will fail validation.
 
 20. **Re-authentication**: Users with expired sessions are redirected back to the sign-in page to authenticate again.
 
-This authentication flow leverages NextAuth.js and GitHub OAuth to provide a secure, streamlined authentication experience while maintaining detailed user records and session information in the database.
+## JWT vs Database Sessions
+
+EDURange Cloud uses JWT (JSON Web Token) for session management instead of database sessions. Here's why:
+
+```mermaid
+graph TD
+    A[Session Management] --> B{JWT or Database?}
+    B -->|JWT Strategy| C[JWT Benefits]
+    B -->|Database Strategy| D[Database Benefits]
+
+    C --> C1[Stateless: No DB queries for session validation]
+    C --> C2[Better performance: Reduced DB load]
+    C --> C3[Works with serverless functions]
+    C --> C4[Compatible with Credentials provider]
+
+    D --> D1[Easier to revoke sessions]
+    D --> D2[No size limitations]
+    D --> D3[No client-side storage concerns]
+
+    C1 --> E[EDURange Cloud Choice: JWT]
+    C2 --> E
+    C3 --> E
+    C4 --> E
+```
+
+### Why JWT?
+
+1. **Performance**: JWT sessions don't require a database query on each request to validate the session, reducing database load.
+
+2. **Statelessness**: JWTs are self-contained and include all necessary user information, making them ideal for serverless environments.
+
+3. **Compatibility**: The Credentials provider (used for development login) requires JWT sessions to function properly.
+
+4. **Scalability**: JWT sessions scale better in distributed systems as they don't require shared session storage.
+
+### JWT Flow in EDURange Cloud
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant NextAuth as NextAuth.js
+    participant JWT as JWT Token
+    participant API as Protected API
+
+    User->>NextAuth: Authenticates
+    NextAuth->>JWT: Creates token with user data
+    NextAuth->>User: Sets JWT cookie
+
+    User->>API: Requests protected resource
+    API->>JWT: Validates token
+    JWT->>API: Returns decoded user data
+
+    alt Valid Token
+        API->>User: Returns authorized content
+    else Invalid Token
+        API->>User: Returns 401 Unauthorized
+        User->>NextAuth: Redirected to sign-in
+    end
+```
+
+The JWT contains essential user information including:
+- User ID (`sub` claim)
+- User role (custom `role` claim)
+- Expiration time (`exp` claim)
+
+This information is used to authorize access to protected resources without needing additional database queries.
 
 ## Configuration
 
-The authentication configuration is defined in `dashboard/auth.config.ts` and used in `dashboard/auth.ts`. The API routes are defined in `dashboard/app/api/auth/[...nextauth]/route.ts`, which imports and exports the handler from `auth.ts`.
+The authentication configuration is defined in `dashboard/lib/auth.ts` and used in `dashboard/auth.ts`. The API routes are defined in `dashboard/app/api/auth/[...nextauth]/route.ts`, which imports and exports the handler from `auth.ts`.
 
 ### Basic Configuration
 
+The authentication configuration consists of several key parts:
+
+#### 1. Imports and Adapter Setup
+
 ```typescript
-// dashboard/auth.config.ts
-import type { AuthOptions } from 'next-auth';
-import GithubProvider from 'next-auth/providers/github';
-import { PrismaAdapter } from '@auth/prisma-adapter';
-import { PrismaClient, UserRole } from '@prisma/client';
-import { ActivityLogger, ActivityEventType } from './lib/activity-logger';
+// dashboard/lib/auth.ts
+import { NextAuthOptions } from "next-auth";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { db } from "@/lib/db";
+import GitHubProvider from "next-auth/providers/github";
+import { getDevAuthProvider } from "./dev-auth-provider";
+```
 
-const prisma = new PrismaClient();
+We import the necessary dependencies, including the PrismaAdapter to connect NextAuth.js with our database.
 
-const authConfig: AuthOptions = {
-  adapter: PrismaAdapter(prisma) as Adapter,
+#### 2. Session Configuration
+
+```typescript
+export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(db) as any,
   session: {
-    strategy: "database",
+    strategy: "jwt", // Using JWT for sessions
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  providers: [
-    GithubProvider({
-      clientId: process.env.AUTH_GITHUB_ID ?? '',
-      clientSecret: process.env.AUTH_GITHUB_SECRET ?? '',
-    }),
-    // Additional OAuth providers will be added here in the future
-  ],
   pages: {
-    signIn: '/' // Sign-in page
+    signIn: "/signin", // Sign-in page
   },
-  callbacks: {
-    // Custom callbacks for redirect, session, and signIn
-  }
+  // ...
 };
-
-export default authConfig;
 ```
+
+This section configures:
+- The database adapter (Prisma)
+- The session strategy (JWT)
+- The session lifetime (30 days)
+- Custom pages for authentication flows
+
+#### 3. Session Callback
 
 ```typescript
-// dashboard/auth.ts
-import NextAuth from "next-auth";
-import authConfig from '@/auth.config';
-
-const handler = NextAuth(authConfig);
-
-export { handler as GET, handler as POST };
+callbacks: {
+  async session({ session, token }) {
+    // Add user data from the JWT token to the session
+    if (token.sub && session.user) {
+      session.user.id = token.sub;
+    }
+    if (token.role && session.user) {
+      session.user.role = token.role as "ADMIN" | "INSTRUCTOR" | "STUDENT";
+    }
+    return session;
+  },
+  // ...
+}
 ```
+
+The session callback runs whenever a session is accessed. It adds the user ID and role from the JWT token to the session object, making this information available to the application.
+
+#### 4. JWT Callback
+
+```typescript
+async jwt({ token, user }) {
+  // Add user role to the JWT token
+  if (user) {
+    token.role = user.role;
+  }
+  return token;
+},
+```
+
+The JWT callback runs when a JWT is created or updated. It adds the user's role to the token, which will later be added to the session via the session callback.
+
+#### 5. Redirect Callback
+
+```typescript
+async redirect({ url, baseUrl }) {
+  // Redirect to home instead of dashboard
+  if (url.includes('/dashboard')) {
+    return `${baseUrl}/home`;
+  }
+
+  // Allow relative URLs
+  if (url.startsWith('/')) {
+    return `${baseUrl}${url}`;
+  }
+
+  // Allow callback URLs on the same origin
+  if (new URL(url).origin === baseUrl) {
+    return url;
+  }
+
+  return baseUrl;
+},
+```
+
+The redirect callback customizes the redirection behavior after authentication. It ensures users are redirected to the appropriate page based on the URL.
+
+#### 6. Authentication Providers
+
+```typescript
+providers: [
+  GitHubProvider({
+    clientId: process.env.AUTH_GITHUB_ID!,
+    clientSecret: process.env.AUTH_GITHUB_SECRET!,
+  }),
+  // Development login provider (only in non-production)
+  // Added via getDevAuthProvider()
+],
+```
+
+This section configures the authentication providers. In production, only GitHub OAuth is available. In development, additional providers are added via the `getDevAuthProvider()` function.
 
 ## Authentication Providers
 
-EDUrange Cloud currently supports GitHub OAuth for authentication:
+EDURange Cloud supports two types of authentication providers:
 
 ### GitHub OAuth
 
-The GitHub provider is configured in `auth.config.ts`:
+The GitHub provider is configured in `lib/auth.ts`:
 
 ```typescript
-GithubProvider({
-  clientId: process.env.AUTH_GITHUB_ID ?? '',
-  clientSecret: process.env.AUTH_GITHUB_SECRET ?? '',
+GitHubProvider({
+  clientId: process.env.AUTH_GITHUB_ID!,
+  clientSecret: process.env.AUTH_GITHUB_SECRET!,
 }),
 ```
 
 This allows users to sign in with their GitHub accounts. The implementation uses environment variables to store the GitHub OAuth credentials.
 
-### Future OAuth Providers
+### Development Login Provider
 
-The platform is designed to easily accommodate additional OAuth providers. Planned future integrations include:
-
-- Google OAuth
-- Microsoft OAuth (for educational institutions)
-- Apple OAuth
-
-Adding these providers will require minimal changes to the existing authentication system, as NextAuth.js supports multiple providers out of the box.
-
-## Database Integration
-
-The authentication system uses the Prisma adapter to integrate with the PostgreSQL database:
+For development and testing purposes, a Credentials provider is available in non-production environments. This provider is implemented in a separate module (`lib/dev-auth-provider.ts`) to keep production code clean:
 
 ```typescript
-adapter: PrismaAdapter(prisma) as Adapter,
-```
-
-The adapter automatically manages:
-
-- User accounts
-- OAuth accounts (for linking providers)
-- Sessions
-- Verification tokens
-
-### Database Schema
-
-The authentication-related tables in the database include:
-
-- `User`: Stores user information including role
-- `Account`: Stores OAuth account details
-- `Session`: Stores active sessions
-
-For a complete view of the database schema, see the [Database Schema documentation](../Database/schema.md).
-
-## Session Management
-
-Sessions in EDUrange Cloud are managed using the database strategy:
-
-```typescript
-session: {
-  strategy: "database",
-  maxAge: 30 * 24 * 60 * 60, // 30 days
-},
-```
-
-### Session Flow
-
-1. User authenticates through GitHub
-2. NextAuth.js creates a session record in the database
-3. Session information is stored in cookies
-4. The session is validated on each request
-5. The session expires after 30 days
-
-
-## Role-Based Access Control
-
-EDUrange Cloud implements role-based access control through the User model with three roles:
-
-```typescript
-// Type definitions in next-auth.d.ts
-interface Session {
-  user: {
-    id: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
-  }
-}
-```
-
-The session callback ensures that the user's role is included in the session:
-
-```typescript
-async session({ session, user }) {
-  if (session.user) {
-    session.user.id = user.id;
-    session.user.role = user.role || 'STUDENT';
-  }
-  return session;
-},
-```
-
-## Activity Logging
-
-Authentication events are logged using the ActivityLogger class:
-
-```typescript
-// In auth.config.ts signIn callback
-if (account?.type === 'oauth') {
-  // For new users
-  await ActivityLogger.logUserEvent(
-    ActivityEventType.USER_REGISTERED,
-    newUser.id,
-    {
-      email: oauthUser.email,
-      name: oauthUser.name,
-      timestamp: new Date().toISOString()
-    }
-  );
-
-  // For existing users
-  await ActivityLogger.logUserEvent(
-    ActivityEventType.USER_LOGGED_IN,
-    existingUser.id,
-    {
-      email: existingUser.email,
-      name: existingUser.name,
-      timestamp: new Date().toISOString()
-    }
-  );
-}
-```
-
-The ActivityLogger supports various event types related to authentication:
-
-```typescript
-export enum ActivityEventType {
-  // Other events...
-  USER_REGISTERED = "USER_REGISTERED",
-  USER_LOGGED_IN = "USER_LOGGED_IN",
-  USER_ROLE_CHANGED = "USER_ROLE_CHANGED",
-  USER_UPDATED = "USER_UPDATED",
-  USER_DELETED = "USER_DELETED",
-  // Other events...
-}
-```
-
-For more information on how activity logging is implemented and used throughout the application, see the [Activity Logging documentation](./activity_logging.mdx).
-
-## Client-Side Authentication
-
-On the client side, the `useSession` hook from NextAuth.js is used to access the session and user information:
-
-```typescript
-import { useSession } from "next-auth/react";
-
-export default function Dashboard() {
-  const { data: session, status } = useSession();
-
-  if (status === "loading") {
-    return <p>Loading...</p>;
+// dashboard/lib/dev-auth-provider.ts
+export const getDevAuthProvider = () => {
+  // First security check: Only return the provider in development
+  if (process.env.NODE_ENV === 'production') {
+    return [];
   }
 
-  if (status === "unauthenticated") {
-    return <p>Access Denied</p>;
-  }
+  return [
+    CredentialsProvider({
+      id: "credentials",
+      name: 'Development Login',
+      credentials: {
+        name: { label: "Name", type: "text" },
+        email: { label: "Email", type: "email" },
+        role: { label: "Role", type: "text" }, // Kept for backward compatibility but ignored
+        existingUser: { label: "Existing User", type: "text" }
+      },
+      async authorize(credentials) {
+        // Second security check: Reject all requests in production
+        if (process.env.NODE_ENV === 'production') {
+          console.error("Development login attempted in production environment");
+          return null;
+        }
 
-  return (
-    <div>
-      <h1>Welcome, {session.user.name}</h1>
-      {/* Dashboard content */}
-    </div>
-  );
-}
-```
-
-
-## Authentication UI
-
-The authentication UI is implemented in the following files:
-
-- `dashboard/app/(auth)/(signin)/page.tsx`: The main sign-in page
-- `dashboard/components/forms/user-auth-form.tsx`: The authentication form component
-- `dashboard/components/github-auth-button.tsx`: The GitHub sign-in button
-
-The GitHub sign-in button uses the `signIn` function from NextAuth.js:
-
-```typescript
-// dashboard/components/github-auth-button.tsx
-import { signIn } from 'next-auth/react';
-
-export default function GoogleSignInButton() {
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl');
-
-  return (
-    <Button
-      className="w-full"
-      variant="outline"
-      type="button"
-      onClick={() =>
-        signIn('github', { callbackUrl: callbackUrl ?? '/home' })
+        // Logic to find or create users for development
+        // ...
       }
-    >
-      <Icons.gitHub className="mr-2 h-4 w-4" />
-      Continue with Github
-    </Button>
-  );
+    })
+  ];
+};
+```
+
+This provider allows developers to:
+- Create new test users with STUDENT role (for security reasons)
+- Log in to existing test accounts using just their email address
+- Test role-based functionality without needing multiple GitHub accounts
+
+## Development Login Security
+
+The development login feature is designed with multiple layers of security to ensure it's never available in production:
+
+```mermaid
+flowchart TD
+    A[Development Login Request] --> B{Security Check 1: \nProvider Inclusion}
+    B -->|Production| C[Empty Provider Array]
+    B -->|Development| D{Security Check 2: \nAuthorize Function}
+
+    C --> E[No Development Login Available]
+
+    D -->|Production| F[Reject Auth Attempt]
+    D -->|Development| G{Security Check 3: \nUI Component Check}
+
+    G -->|Production| H[Hide Dev Login UI]
+    G -->|Development| I{Security Check 4: \nDevAuthForm Check}
+
+    I -->|Production| J[Show Error Message]
+    I -->|Development| K[Show Development Login Form]
+
+    F --> E
+    H --> E
+    J --> E
+    K --> L[Development Login Available]
+```
+
+### Security Layers
+
+1. **Provider Inclusion Check**:
+   - In `lib/dev-auth-provider.ts`, the function only returns the provider in non-production environments
+   - Production environments receive an empty array, so no development provider is registered
+
+2. **Authorization Function Check**:
+   - Even if the provider somehow gets included, the `authorize` function has a secondary check
+   - It rejects all authentication attempts in production environments
+   - This provides defense in depth against accidental exposure
+
+3. **UI Component Check**:
+   - The `UserAuthForm` component checks `process.env.NODE_ENV` before rendering the development login UI
+   - In production, only the GitHub login option is displayed
+
+4. **DevAuthForm Component Check**:
+   - The `DevAuthForm` component has its own check that prevents rendering in production
+   - If somehow rendered in production, it displays an error message instead of the login form
+
+### Role Security
+
+For additional security, the development login enforces these restrictions:
+
+- All new development accounts are created with STUDENT role by default
+- The role selection has been removed from the UI
+- The backend ignores any role parameter and always sets STUDENT role for new accounts
+- This prevents privilege escalation in development environments
+
+## Authentication Utilities
+
+EDURange Cloud provides several utility functions for working with authentication in the `lib/auth-utils.ts` file:
+
+### 1. Check Admin Status
+
+```typescript
+// Check if a user is an admin
+export async function checkIsAdmin(): Promise<{ isAdmin: boolean; user: User | null }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return { isAdmin: false, user: null };
+  }
+
+  return {
+    isAdmin: session.user.role === 'ADMIN',
+    user: session.user as User
+  };
 }
 ```
 
+This function checks if the current user is an admin by:
+- Getting the current session using `getServerSession`
+- Checking if the user exists in the session
+- Returning an object with `isAdmin` boolean and the user data
 
-## Environment Variables
+### 2. API Route Admin Middleware
 
-The authentication system requires several environment variables:
+```typescript
+// Middleware for API routes to require admin access
+export async function requireAdmin(req: NextRequest): Promise<Response | null> {
+  const { isAdmin } = await checkIsAdmin();
 
+  if (!isAdmin) {
+    return new NextResponse('Unauthorized', { status: 403 });
+  }
+
+  return null;
+}
 ```
-# NextAuth.js
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-secret-here
 
-# GitHub OAuth
-AUTH_GITHUB_ID=your-github-client-id
-AUTH_GITHUB_SECRET=your-github-client-secret
+This middleware function is used in API routes to:
+- Check if the current user is an admin using the `checkIsAdmin` function
+- Return a 403 Forbidden response if the user is not an admin
+- Return null if the user is an admin, allowing the route handler to continue
 
-# Database
-DATABASE_URL=your-database-url
+### 3. Server Component Admin Check
+
+```typescript
+// Server component function to redirect non-admins
+export async function requireAdminAccess() {
+  const { isAdmin } = await checkIsAdmin();
+
+  if (!isAdmin) {
+    redirect('/invalid-permission');
+  }
+}
 ```
 
+This function is used in server components to:
+- Check if the current user is an admin
+- Redirect to an invalid permission page if the user is not an admin
+- Allow the component to render if the user is an admin
 
-## Resources
+These utility functions simplify implementing admin-only features throughout the application by providing consistent authentication and authorization checks.
 
-- [NextAuth.js Documentation](https://next-auth.js.org/getting-started/introduction)
-- [Prisma Adapter Documentation](https://next-auth.js.org/adapters/prisma)
-- [GitHub OAuth Provider Configuration](https://next-auth.js.org/providers/github)
-- [NextAuth.js with Next.js App Router](https://next-auth.js.org/configuration/nextjs#in-app-router)
-- [EDURange Cloud Database Schema](../Database/schema.md)
+## Conclusion
+
+EDURange Cloud's authentication system provides a secure, flexible foundation for user authentication and authorization. By leveraging NextAuth.js with JWT sessions and GitHub OAuth, it offers a modern authentication experience while maintaining detailed user records in the database.
+
+The development login feature enhances the developer experience by allowing easy testing with different user roles, while multiple security layers ensure this feature is never exposed in production environments.
 

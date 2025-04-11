@@ -1,139 +1,520 @@
 # Overview
 
-The challenge pod is a key component in the [Instance Manager](Instance-Manager) system, responsible for providing an isolated environment where users can interact with and solve challenges. This documentation outlines the structure and functionality of the challenge pod.
+A Challenge Pod is a multi-container Kubernetes pod that provides an isolated environment where users can interact with and solve cybersecurity challenges. These pods are dynamically created and managed by the [Instance Manager](Instance_Manager) based on Challenge Definition Format (CDF) specifications and Challenge Type Definitions (CTDs).
 
 ```mermaid
-
-graph LR
+graph TD
     subgraph "Challenge Pod"
         WebOS["WebOS Container<br/>(Next.js App)"]
         RT["Remote-Terminal<br/>(Node.js App)"]
-        Bridge["Bridge Container<br/>(Flask App)<br/><i>Being phased out</i>"]
         ChallengeOS["Challenge OS Container<br/>(Challenge Environment)"]
     end
 
-    User["User Browser"] --> WebOS
-    WebOS --> RT
-    RT -->|"Kubernetes API"| ChallengeOS
-    WebOS -.->|"Legacy Path"| Bridge
-    Bridge -.->|"Direct Connection"| ChallengeOS
+    subgraph "External Access"
+        User["User Browser"]
+        Ingress["Kubernetes Ingress"]
+    end
 
+    subgraph "Challenge Resources"
+        Secret["Flag Secret"]
+        ConfigMap["Challenge ConfigMap"]
+    end
+
+    User -->|"HTTPS"| Ingress
+    Ingress -->|"WebOS URL"| WebOS
+    Ingress -->|"Terminal URL"| RT
+    RT -->|"Kubernetes API"| ChallengeOS
+    WebOS -->|"Apps Config"| RT
+    Secret --> WebOS
+    ConfigMap --> ChallengeOS
 ```
 
-The challenge pod is dynamically created and deleted by the [Instance Manager ](Instance-Manager) in a Kubernetes cluster. It consists of four containers:
+## Pod Structure
 
-**1. Challenge OS:** The environment where the actual challenge exists.
+Modern challenge pods consist primarily of three containers:
 
-**2. WebOS:** A Next.js web app that simulates the look of an operating system. Users interact with the challenge through this interface, specifically using the terminal app.
+**1. Challenge OS Container:** The actual challenge environment where users solve problems.
+   - Can be a Linux OS, web server, database, or any specialized environment
+   - Defined by the `container` component in the CDF
+   - May include specific flags, tools, and configurations for the challenge
 
-**3. Bridge:** A Flask app that connects to the Challenge OS container and facilitates command execution from the WebOS to the Challenge OS. This component is being phased out in favor of the Remote-Terminal for direct command execution.
+**2. WebOS Container:** A Next.js web application that provides a simulated desktop interface.
+   - Includes apps like Terminal, Challenge Prompt, Editor, Browser, and more
+   - Loads configuration defined by `webosApp` components in the CDF
+   - Provides a consistent user experience across different challenge types
 
-**4. Remote-Terminal:** A Node.js application that provides a web-based terminal interface with direct access to the Challenge OS container via the Kubernetes API.
+**3. Remote-Terminal Container:** Provides secure terminal access to the Challenge OS container.
+   - Uses Kubernetes API for secure command execution
+   - Exposes a WebSocket interface for real-time interaction
+   - Requires specific service account permissions
+   - Connected to WebOS via environment variables
 
-# Challenge OS
+## Challenge Type Specialization
 
-The Challenge OS container is the main environment where the actual challenge runs. This container can run any operating system or software stack depending on the type of challenge. It could be a Debian-based system, a web server, a Python environment, or any other setup required for the challenge. The environment is isolated and secure, ensuring that users can only interact with it through the WebOS terminal.
+The specific structure and content of a Challenge Pod varies significantly depending on the challenge type defined in the CTD. Each challenge type has specialized containers, applications, and integrations:
 
-## Example Use Cases
+| Challenge Type | Primary Containers | Specialized Applications | User Interaction Mode | Status |
+|----------------|-------------------|--------------------------|------------------------|--------|
+| FullOS         | Challenge OS + Remote-Terminal | Terminal, File Browser | Command-line interface | Production |
+| Web            | Web Server + Database | Browser, Challenge Prompt | Web interface | Production |
+| PacketAnalysis | WireShark Pod + PCAP Data | WebShark, Editor | Graphical analysis tools | Alpha |
+| Metasploit     | Attack + Target Containers | Metasploit Console, Terminal | Command-line tools | Beta |
+| Network        | Router Sim + Network Devices | Network Topology Viewer | CLI + GUI tools | Planned |
 
-* **Linux Environment:** A challenge that involves navigating and manipulating files within a Linux filesystem.
+> **Note:** The EDURange Cloud platform is actively expanding its challenge type ecosystem. The types listed above represent the current implementation status, with many more specialized challenge types coming soon. Challenge types in Alpha or Beta stages are available for testing but may have limited features or stability.
 
-* **Web Server:** A challenge where users must interact with a running web server, finding and exploiting vulnerabilities.
+### Challenge Type Examples
 
-* **Python Environment:** A challenge that involves running Python scripts and solving problems within a Python-based environment.
+1. **FullOS Challenge Type:**
+   - Primary focus: Linux command-line challenges
+   - Main container: Ubuntu/Debian with SSH server
+   - Required application: Remote-Terminal for command execution
+   - User interaction: Primarily via Terminal app in WebOS
+   - Example challenges: File system exploration, user permissions, service configuration
 
+2. **Web Challenge Type:**
+   - Primary focus: Web application vulnerabilities
+   - Main container: Web server (Apache/Nginx) with application code
+   - Optional database container: MySQL/PostgreSQL for data storage
+   - Required application: Browser app in WebOS
+   - User interaction: Through Browser app accessing the web server
+   - Example challenges: XSS, CSRF, SQL injection, improper authentication
 
-## Two Main Components
+3. **PacketAnalysis Challenge Type:** *(Alpha Stage)*
+   - Primary focus: Network traffic analysis
+   - Main container: WebShark (browser-based Wireshark)
+   - Data: Pre-captured PCAP files
+   - Required application: WebShark app in WebOS
+   - User interaction: Through WebShark interface for packet inspection
+   - Example challenges: Network protocol analysis, traffic inspection, intrusion detection
+   - *Note: This challenge type is currently in alpha and under active development*
 
-**1. Dockerfile:**
-* The Dockerfile defines the base image and the software stack needed for the challenge.
-* It installs necessary packages and sets up the environment.
-* It creates a user and sets up directories and files as needed for the challenge.
+4. **Metasploit Challenge Type:** *(Beta Stage)*
+   - Primary focus: Exploitation techniques
+   - Main containers: Attack container + Target container
+   - Required applications: Terminal with Metasploit Framework
+   - User interaction: Terminal-based command line for exploits
+   - Example challenges: Vulnerability scanning, exploitation, post-exploitation
 
-**Example dockerfile for simple file-wrangling challenge:**
+### Future Challenge Types
 
-```dockerfile filename="dockerfile"
-FROM debian:bullseye-slim
-# Install basic utilities
+The EDURange platform roadmap includes several additional challenge types currently in development:
+
+- **Cryptography**: Specialized environment for cryptographic challenges with tools for encryption/decryption
+- **Digital Forensics**: File system analysis, memory forensics, and artifact extraction
+- **Mobile Security**: Android/iOS security challenges with emulated mobile environments
+- **IoT Security**: Simulated IoT devices and protocols for security analysis
+- **Cloud Security**: AWS/Azure/GCP security configuration challenges
+
+These upcoming challenge types will follow the same architecture pattern with specialized containers and WebOS applications tailored to their specific requirements.
+
+## Deployment Architecture
+
+Challenge pods are deployed through a multi-step process:
+
+1. The dashboard sends a CDF to the Instance Manager
+2. The Instance Manager identifies the challenge type and loads the appropriate CTD
+3. The CTD provides the base pod structure and Kubernetes resource templates
+4. CDF components are processed to customize the pod for the specific challenge
+5. Kubernetes resources (Pod, Service, Ingress, ConfigMap, Secret) are created
+6. URLs are generated and returned to the dashboard for user access
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Dashboard
+    participant IM as Instance Manager
+    participant K8s as Kubernetes API
+    participant Pod as Challenge Pod
+
+    User->>Dashboard: Start Challenge
+    Dashboard->>IM: POST /api/start-challenge with CDF
+    IM->>IM: Process CDF & load CTD
+    IM->>IM: Generate flags & variables
+    IM->>K8s: Create Pod, Service, Ingress
+    K8s->>Pod: Deploy Challenge Pod
+    IM->>Dashboard: Return URLs
+    Dashboard->>User: Provide Challenge Links
+    User->>Pod: Access via WebOS & Terminal
+```
+
+# Challenge Components
+
+The Challenge Definition Format (CDF) includes several component types that define different aspects of the challenge pod:
+
+## 1. Container Components
+
+Container components define the environments within the challenge pod:
+
+```json
+{
+  "type": "container",
+  "id": "challenge-container",
+  "config": {
+    "image": "registry.edurange.cloud/challenges/ubuntu-flags:latest",
+    "env": [
+      {
+        "name": "DIFFICULTY",
+        "value": "easy"
+      }
+    ],
+    "resources": {
+      "limits": {
+        "cpu": "0.5",
+        "memory": "512Mi"
+      }
+    },
+    "ports": [
+      {
+        "containerPort": 22,
+        "name": "ssh"
+      }
+    ],
+    "securityContext": {
+      "runAsUser": 0,
+      "privileged": false
+    }
+  }
+}
+```
+
+### Container Configuration Options
+
+- **image**: Docker image for the container
+- **env**: Environment variables
+- **resources**: CPU, memory, and other resource constraints
+- **ports**: Container port definitions
+- **securityContext**: Security settings like privileged mode and user ID
+- **volumes**: Volume mounts (emptyDir, configMap, secret)
+- **initScripts**: Scripts to run during container initialization
+
+## 2. WebOS App Components
+
+WebOS app components define applications in the WebOS interface:
+
+```json
+{
+  "type": "webosApp",
+  "id": "terminal",
+  "config": {
+    "title": "Terminal",
+    "icon": "./icons/terminal.svg",
+    "width": 800,
+    "height": 600,
+    "screen": "terminal",
+    "favourite": true,
+    "desktop_shortcut": true,
+    "launch_on_startup": true
+  }
+}
+```
+
+### WebOS App Configuration Options
+
+- **title**: App title displayed in the window header
+- **icon**: Path to the app icon
+- **width/height**: Default window dimensions
+- **screen**: Component name to render (e.g., "terminal", "displayChrome", "displayChallengePrompt")
+- **favourite**: Whether to include in favorites dock
+- **desktop_shortcut**: Whether to display on desktop
+- **launch_on_startup**: Whether to launch automatically when WebOS starts
+
+## 3. Question Components
+
+Question components define assessment questions for the challenge:
+
+```json
+{
+  "type": "question",
+  "id": "file-flag",
+  "config": {
+    "type": "flag",
+    "prompt": "Find the flag hidden in the home directory.",
+    "points": 10
+  }
+}
+```
+
+### Question Configuration Options
+
+- **type**: Question type ("flag", "text", "multiple_choice")
+- **prompt**: Question text displayed to the user
+- **points**: Point value for correct answers
+- **answer**: For non-flag questions, the correct answer
+- **options**: For multiple choice questions, the available options
+
+## 4. ConfigMap Components
+
+ConfigMap components create Kubernetes ConfigMaps for configuration data:
+
+```json
+{
+  "type": "configmap",
+  "id": "challenge-config",
+  "config": {
+    "data": {
+      "hints.txt": "Check hidden files in the system",
+      "instructions.md": "# Challenge Instructions\n\nFind all the flags..."
+    }
+  }
+}
+```
+
+## 5. Secret Components
+
+Secret components create Kubernetes Secrets for sensitive data:
+
+```json
+{
+  "type": "secret",
+  "id": "challenge-secret",
+  "config": {
+    "data": {
+      "username": "admin",
+      "password": "base64:cGFzc3dvcmQxMjM="
+    }
+  }
+}
+```
+
+# Challenge Type-Specific Containers
+
+Each challenge type requires specialized containers to create the appropriate learning environment. Below are details for different challenge types:
+
+## FullOS Challenges
+
+FullOS challenges provide a complete operating system environment for command-line based challenges.
+
+**Key characteristics:**
+- Linux-based container with shell access
+- SSH server for Remote-Terminal connectivity
+- User accounts and permissions
+- Task-specific file structure and permissions
+- Network services and configurations
+- Custom flags hidden throughout the system
+
+### Example FullOS Dockerfile
+
+```dockerfile
+FROM ubuntu:22.04
+
+# Install necessary packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    openssh-server \
+    vim \
+    nano \
     curl \
     wget \
-    vim \
-    git \
-    sudo && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-# Create a user and set up directory structure
-RUN useradd -m -s /bin/bash challengeuser && \
-    mkdir -p /home/challengeuser/Documents /home/challengeuser/Downloads /home/challengeuser/Pictures
-# Copy the entrypoint script
-COPY entrypoint.sh /home/challengeuser/entrypoint.sh
-RUN chmod +x /home/challengeuser/entrypoint.sh
-# Switch to the new user
-USER challengeuser
-WORKDIR /home/challengeuser
-# Set the command to run the entrypoint script
-CMD ["/home/challengeuser/entrypoint.sh"]
-```
-**2. Entrypoint Script**
-* The entrypoint script is executed when the container starts.
+    sudo \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-* It writes the challenge flag to a hidden file within the container. The flag is passed as an environment variable (FLAG) to the container by the Instance Manager.
+# Create users
+RUN useradd -m -s /bin/bash student && \
+    echo "student:student" | chpasswd && \
+    useradd -m -s /bin/bash admin && \
+    echo "admin:adminpassword" | chpasswd
 
-* After writing the flag, the script unsets the FLAG environment variable to enhance security.
+# Set up challenge files
+COPY ./challenge-files/ /opt/challenge/
+RUN chmod 755 /opt/challenge/setup.sh && \
+    /opt/challenge/setup.sh
 
-* Finally, the script starts a shell to allow users to interact with the environment.
+# Configure SSH
+RUN mkdir -p /var/run/sshd
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
+RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
-**Example entrypoint.sh for above simple file-wrangling challenge:**
-
-```shell filename="entrypoint.sh"
-#!/bin/bash
-# Write the flag to a hidden file
-echo "$FLAG" > /home/challengeuser/.hidden_flag.txt
-# Unset the FLAG environment variable
-unset FLAG
-# Start a shell
-exec /bin/bash
+# Start SSH server
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D"]
 ```
 
-# Bridge
+## Web Challenges
 
-The Bridge container acts as an intermediary between the WebOS and Challenge OS. It is a Python Flask application that maintains a WebSocket connection to receive commands from the WebOS and executes them in the Challenge OS.
+Web challenges provide a web server environment for exploring web application vulnerabilities.
 
-**Note:** The Bridge component is being phased out in favor of the Remote-Terminal component for direct command execution. It is still included in the pod for backward compatibility and for specific use cases where direct API access is not preferred.
+**Key characteristics:**
+- Web server (Apache, Nginx) container
+- Application code (PHP, Node.js, etc.)
+- Optional database container
+- Web application vulnerabilities
+- Exposed HTTP/HTTPS ports
+- Flag storage within web application components
 
-**Key Functionality:**
+### Example Web Challenge Dockerfile
 
-* **Command Execution:** Receives commands from the WebOS, executes them in the Challenge OS, and returns the output.
+```dockerfile
+FROM php:7.4-apache
 
-* **WebSocket Communication:** Handles real-time communication between the WebOS and the Challenge OS.
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) gd mysqli pdo pdo_mysql \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Remote-Terminal
+# Copy web application files
+COPY ./web-app/ /var/www/html/
+RUN chown -R www-data:www-data /var/www/html/
 
-The Remote-Terminal container is a newer addition to the challenge pod that provides a more direct and secure way for users to interact with the Challenge OS. It is a Node.js application that uses the Kubernetes API to execute commands directly in the Challenge OS container.
+# Configure Apache
+COPY ./apache-config/000-default.conf /etc/apache2/sites-available/000-default.conf
+RUN a2enmod rewrite
 
-**Key Functionality:**
+# Expose web port
+EXPOSE 80
+CMD ["apache2-foreground"]
+```
 
-* **Direct Command Execution:** Uses the Kubernetes API to execute commands directly in the Challenge OS container without requiring an intermediary service.
+## PacketAnalysis Challenges
 
-* **WebSocket Communication:** Maintains a WebSocket connection with the browser for real-time command execution and output display.
+PacketAnalysis challenges provide a browser-based Wireshark-like interface (WebShark) for analyzing network traffic.
 
-* **Rich Terminal Experience:** Provides a feature-rich terminal interface with support for copy/paste, font size adjustment, and other terminal features.
+**Key characteristics:**
+- WebShark container (browser-based packet analyzer)
+- Pre-captured PCAP files with network traffic
+- No Remote-Terminal necessary
+- Flags embedded within packet data
+- Focus on network protocol analysis
 
-* **Secure Access Control:** Uses Kubernetes RBAC (Role-Based Access Control) to ensure secure access to the Challenge OS container.
+### Example PacketAnalysis Dockerfile
 
+```dockerfile
+FROM nikolaik/python-nodejs:python3.9-nodejs16-slim
 
-# WebOS
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    tshark \
+    tcpdump \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-The WebOS container runs a Next.js application that provides a graphical interface simulating an operating system. Users interact with the challenge through this simulated OS. The WebOS includes a Terminal application that embeds the Remote-Terminal interface, allowing users to interact with the Challenge OS container.
+# Copy WebShark application
+COPY ./webshark/ /app/
+WORKDIR /app
 
-**Key Functionality:**
+# Install Node.js dependencies
+RUN npm install
 
-**Terminal Interaction:** Users access the terminal app in the WebOS, which loads the Remote-Terminal interface. This interface connects directly to the Challenge OS container via the Kubernetes API, providing a seamless command-line experience.
+# Copy PCAP files
+COPY ./pcap-files/ /pcap/
+RUN chmod 644 /pcap/*.pcap
 
-**Graphical Interface:** Simulates an operating system with various applications. This enhances user experience by providing a familiar environment for interacting with the challenges.
+# Expose application port
+EXPOSE 3000
+CMD ["npm", "start"]
+```
 
->Detailed documentation for the WebOS can be found [here](WebOS)
+## Metasploit Challenges
 
->Detailed documentation for the Remote-Terminal can be found [here](Terminal)
+Metasploit challenges provide an attack/defend environment with intentionally vulnerable targets.
+
+**Key characteristics:**
+- Attack container with Metasploit Framework
+- Target container with vulnerabilities
+- Network connectivity between containers
+- Flag generation upon successful exploitation
+- Segmented network for safety
+
+### Example Metasploit Attack Container
+
+```dockerfile
+FROM kalilinux/kali-rolling:latest
+
+# Install necessary packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    metasploit-framework \
+    nmap \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up workspace
+WORKDIR /root
+RUN mkdir -p /root/workspace
+
+# Start Metasploit console
+CMD ["/bin/bash"]
+```
+
+# WebOS Container
+
+The WebOS container provides a browser-based desktop environment for interacting with challenges. It loads application configurations from the CDF and presents a consistent user interface regardless of the underlying challenge type.
+
+Key features:
+
+- Window management system
+- Application framework
+- Terminal integration
+- Challenge prompt with questions and assessment
+- File browser and editor
+- Other utility applications
+
+The WebOS container is configured via environment variables that define:
+
+- Available applications
+- Default window sizes and positions
+- Application startup behavior
+- URLs for accessing other parts of the challenge pod
+
+## Challenge Type-Specific WebOS Applications
+
+Different challenge types require different WebOS applications:
+
+1. **FullOS Challenges**
+   - Terminal (required)
+   - File Browser (optional)
+   - Challenge Prompt (required)
+   - Text Editor (optional)
+
+2. **Web Challenges**
+   - Browser (required)
+   - Challenge Prompt (required)
+   - Terminal (optional)
+   - Developer Tools (optional)
+
+3. **PacketAnalysis Challenges**
+   - WebShark (required)
+   - Challenge Prompt (required)
+   - Text Editor (optional)
+   - Network Diagram (optional)
+
+4. **Metasploit Challenges**
+   - Terminal (required)
+   - Challenge Prompt (required)
+   - Browser (optional)
+   - Network Scanner (optional)
+
+# Remote-Terminal Container
+
+The Remote-Terminal container provides secure access to the Challenge OS container through the Kubernetes API. It uses a WebSocket interface to provide real-time terminal interaction from the browser.
+
+Key features:
+
+- Authentication via Kubernetes service account
+- Secure command execution in the target container
+- WebSocket communication for real-time interaction
+- Support for terminal features (copy/paste, resize, etc.)
+- No direct access to the host system
+
+## Security Considerations
+
+Challenge pods implement several security measures:
+
+1. **Container Isolation**: Each challenge runs in its own isolated pod
+2. **Network Policies**: Restrict communication between pods
+3. **RBAC**: Service accounts with limited permissions
+4. **Seccomp Profiles**: Restrict system calls
+5. **Resource Limits**: Prevent resource exhaustion
+6. **Pod Security Context**: Control user permissions and capabilities
+7. **Ingress Controls**: Restrict external access to specific paths
+
+For more information on the Instance Manager that creates and manages these challenge pods, see the [Instance Manager](Instance_Manager) documentation.

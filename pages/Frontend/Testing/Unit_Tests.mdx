@@ -1,0 +1,55 @@
+# Unit Tests
+
+These tests focus on individual modules and functions without database integration.
+
+## Input Validation
+
+**File:** `unit/input-validation.test.ts`
+
+**What it tests:**
+- String sanitization for XSS prevention
+- Validation of common data types (email, password, name, URL, ID)
+- Object validation with nested properties
+- Error handling for invalid inputs
+- Schema composition and reuse
+
+**Mocked vs. Live Data:**
+- **Mocked:** None
+- **Live:**
+  - Validation module functions
+  - Zod schema validation
+
+## Rate Limiting
+
+**File:** `unit/rate-limit.test.ts`
+
+**What it tests:**
+- Basic rate limiting functionality
+- Blocking requests that exceed the limit
+- Proper reset after the configured interval
+- IP-based tracking with isolation
+- Custom token-based rate limiting
+
+**Mocked vs. Live Data:**
+- **Mocked:**
+  - Request objects
+  - Timers
+- **Live:**
+  - Rate limiting module functions
+
+## Authentication
+
+**File:** `unit/auth.test.ts`
+
+**What it tests:**
+- User management (creation, role updates)
+- Session management and expiration
+- OAuth account linking
+- Authentication activity logging
+- Role-based access control
+
+**Mocked vs. Live Data:**
+- **Mocked:** None (uses real database transactions that are rolled back)
+- **Live:**
+  - Database operations via Prisma
+  - Authentication module functions 

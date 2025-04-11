@@ -1,0 +1,236 @@
+# End-to-End (E2E) Tests
+
+[![Tested with Puppeteer](https://img.shields.io/badge/Tested%20with-Puppeteer-40B5A4.svg)](https://pptr.dev/)
+
+End-to-End (E2E) tests verify that the application works correctly from a user's perspective by simulating real user interactions with the application. EDURange Cloud uses Puppeteer with Jest for E2E testing to ensure that the application's critical flows work as expected in a browser environment.
+
+## Overview
+
+Our E2E tests focus on critical user flows and ensure that:
+
+- Authentication and authorization work correctly
+- Navigation between pages functions as expected
+- UI components render and interact properly
+- Form submissions process data correctly
+- Security measures like middleware protection function properly
+
+## Test Structure
+
+E2E tests are located in the `dashboard/tests/e2e` directory and are organized by feature area:
+
+```
+dashboard/tests/e2e/
+├── setup.ts                         (Test setup and helper functions)
+├── middleware.test.ts               (Tests for middleware protection)
+├── auth-middleware.test.ts          (Tests for authentication middleware)
+└── competition-management.test.ts   (Tests for competition management)
+```
+
+## Authentication Testing
+
+Our E2E tests use a sophisticated approach to simulate authenticated users:
+
+- **Session Cookie Simulation**: We create properly formatted session cookies that NextAuth accepts
+- **Role-Based Testing**: Helper functions for different user roles (student, admin)
+- **JWT Simulation**: Properly signed JWT tokens with all required fields
+- **CSRF Protection**: Proper CSRF token cookies for form submissions
+
+Example from `setup.ts`:
+
+```typescript
+// Create a properly formatted session cookie for NextAuth
+function createMockSessionCookie(user: any) {
+  // Create JWT payload with required fields
+  const payload = {
+    name: user.name,
+    email: user.email,
+    sub: user.id,
+    role: user.role,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 86400,
+    jti: uuidv4()
+  };
+
+  // Sign the JWT with the test secret
+  const token = jwt.sign(payload, TEST_SECRET);
+
+  // Create the session cookie value
+  const cookieValue = {
+    user: {
+      name: user.name,
+      email: user.email,
+      id: user.id,
+      role: user.role
+    },
+    expires: new Date(Date.now() + 86400 * 1000).toISOString()
+  };
+
+  // Return the properly formatted cookie
+  return `next-auth.session-token=${token}`;
+}
+```
+
+## Middleware Testing
+
+We test that the middleware correctly:
+
+- Allows access to public routes
+- Protects authenticated routes
+- Enforces role-based access control
+- Sets proper security headers
+- Handles session expiration
+
+Our middleware tests are organized into distinct user contexts:
+
+### Unauthenticated User Access
+
+Tests verify that unauthenticated users:
+- Are redirected to the home page when accessing protected routes
+- Can access public routes without redirection
+- Cannot access admin-only routes
+
+Example test:
+
+```typescript
+test('redirects to home page when accessing protected route without authentication', async () => {
+  await page.goto(`${BASE_URL}/dashboard`);
+  await page.waitForNavigation();
+  expect(page.url()).toBe(`${BASE_URL}/`);
+});
+```
+
+### Student User Access
+
+Tests verify that student users:
+- Can access student-specific routes
+- Are redirected to invalid-permission page when accessing admin-only routes
+- Can access their profile and other authorized pages
+
+### Admin User Access
+
+Tests verify that admin users:
+- Can access admin dashboard and admin-only routes
+- Can access their profile and other authorized pages
+- Have full access to the application
+
+### Logout Behavior
+
+Tests verify that:
+- Users are properly logged out when their session is cleared
+- After logout, protected routes redirect to the home page
+
+### Session Expiry
+
+Tests verify that:
+- Expired sessions are properly detected
+- Users with expired sessions are redirected to the home page
+
+## Competition Management Testing
+
+Our competition management tests verify that:
+
+- Admins can navigate to the competition management page
+- Admins can create new competitions
+- Admins can manage access codes
+- Admins can add challenges to competitions
+- Students can view available competitions
+- Students can join competitions with access codes
+- Students can view joined competitions and their challenges
+
+The tests use real database operations to ensure complete end-to-end validation:
+
+- **Test User Creation**: Creates real test users with appropriate roles
+- **Competition Creation**: Creates real competitions in the database
+- **Access Code Management**: Tests the creation and usage of access codes
+- **Challenge Management**: Tests adding and viewing challenges in competitions
+- **Data Cleanup**: Ensures all test data is properly cleaned up after tests
+
+Example test:
+
+```typescript
+test('admin can create a new competition', async () => {
+  await mockAdminLogin(page);
+  await page.goto(`${BASE_URL}/dashboard/competitions`);
+
+  // Find and click the "Create Competition" button
+  const createButton = await page.waitForSelector('button:has-text("Create Competition")');
+  await createButton.click();
+
+  // Fill out the competition form
+  const competitionName = `Test Competition ${Date.now()}`;
+  await page.type('input[name="name"]', competitionName);
+  await page.type('textarea[name="description"]', 'Test competition description');
+
+  // Submit the form
+  await page.click('button[type="submit"]');
+
+  // Verify the competition was created
+  await page.waitForNavigation();
+  const pageContent = await page.content();
+  expect(pageContent).toContain(competitionName);
+});
+```
+
+## Running E2E Tests
+
+To run the E2E tests:
+
+```bash
+npm run test:e2e
+```
+
+To run a specific test file:
+
+```bash
+npm run test:e2e -- -t "Authentication Middleware"
+```
+
+This command starts a development server and runs the E2E tests against it. The tests are configured to run in a headless browser by default, but you can modify the configuration in `jest-puppeteer.config.js` to run with a visible browser for debugging.
+
+## Debugging E2E Tests
+
+Our E2E tests include comprehensive debugging features:
+
+- **Screenshots**: Tests capture screenshots at key points for visual debugging
+- **Console Logging**: Browser console messages are captured and logged
+- **Page Content Logging**: HTML content is logged at critical points
+- **Network Request Logging**: API requests and responses are logged
+- **Element State Logging**: UI element states are logged for debugging
+
+Example debugging code:
+
+```typescript
+// Take a screenshot for debugging
+await page.screenshot({ path: 'form-submission-debug.png' });
+
+// Log page content
+console.log('Page content:', await page.content());
+
+// Log element state
+const buttonState = await page.evaluate(() => {
+  const button = document.querySelector('button[type="submit"]');
+  return {
+    disabled: button?.disabled,
+    visible: button?.offsetParent !== null,
+    text: button?.textContent
+  };
+});
+console.log('Button state:', buttonState);
+```
+
+## Best Practices
+
+When writing E2E tests:
+
+1. **Focus on critical paths**: Test the most important user flows
+2. **Use data-testid attributes**: Add `data-testid` attributes to elements for reliable selection
+3. **Implement fallback strategies**: Use multiple selector strategies for resilience
+4. **Minimize test flakiness**: Add appropriate waits and assertions to reduce flaky tests
+5. **Keep tests independent**: Each test should be able to run independently
+6. **Clean up after tests**: Ensure tests clean up any data they create
+7. **Use page.evaluate for complex interactions**: For complex DOM interactions, use `page.evaluate`
+8. **Add comprehensive error handling**: Make tests fail explicitly with clear error messages
+9. **Use screenshots for debugging**: Capture screenshots at key points to aid debugging
+10. **Test with real data**: Use real database operations for complete end-to-end validation
+11. **Verify authentication state**: Ensure users are properly authenticated before testing protected features
+12. **Add soft assertions for non-critical checks**: Use warnings instead of failures for non-critical assertions

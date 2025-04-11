@@ -1,22 +1,27 @@
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '8px' }, 'er': {'useMaxWidth': true, 'diagramPadding': 10, 'layoutDirection': 'TB'}, 'securityLevel': 'loose'}}%%
 erDiagram
     %% Top Level - Core User and Authentication
     User ||--o{ Account : "has"
     User ||--o{ Session : "has"
+    User ||--o{ ActivityLog : "generates"
 
     %% Second Level - Competition Organization
     User }o--o{ CompetitionGroup : "memberOf"
     User }o--o{ CompetitionGroup : "instructorOf"
     CompetitionGroup ||--o{ CompetitionAccessCode : "has"
+    CompetitionAccessCode ||--o{ ActivityLog : "generates"
 
     %% Third Level - Challenge Structure
-    ChallengeType ||--o{ Challenges : "contains"
+    ChallengeType ||--o{ Challenge : "contains"
+    ChallengePack ||--o{ Challenge : "packages"
     CompetitionGroup ||--o{ GroupChallenge : "contains"
-    GroupChallenge }|--|| Challenges : "uses"
+    GroupChallenge }|--|| Challenge : "uses"
 
     %% Fourth Level - Challenge Instances and Completions
     User ||--o{ ChallengeInstance : "creates"
-    Challenges ||--o{ ChallengeInstance : "instances"
+    Challenge ||--o{ ChallengeInstance : "instances"
+    ChallengeInstance ||--o{ ActivityLog : "generates"
     
     %% Fifth Level - Progress and Points
     User ||--o{ ChallengeCompletion : "completes"
@@ -24,14 +29,17 @@ erDiagram
     User ||--o{ GroupPoints : "earns"
     CompetitionGroup ||--o{ GroupPoints : "tracks"
 
-    %% AppsConfig JSON Structure
-    Challenges ||--|| AppsConfig : "contains"
-    AppsConfig ||--o{ App : "contains_array"
-    App ||--o{ AppProperties : "has"
-    App ||--|| ChallengePrompt : "may_include"
-    ChallengePrompt ||--|| Challenge : "contains"
-    Challenge ||--o{ Page : "has"
-    Page ||--o{ Question : "has"
+    %% Questions and Attempts
+    Challenge ||--o{ ChallengeQuestion : "has"
+    User ||--o{ QuestionAttempt : "makes"
+    User ||--o{ QuestionCompletion : "achieves"
+    ChallengeQuestion ||--o{ QuestionAttempt : "attempts"
+    ChallengeQuestion ||--o{ QuestionCompletion : "completions"
+    GroupChallenge ||--o{ QuestionAttempt : "tracks"
+    GroupChallenge ||--o{ QuestionCompletion : "tracks"
+
+    %% App Configuration
+    Challenge ||--o{ ChallengeAppConfig : "configures"
 
     %% Core Authentication (Level 1)
     User {
@@ -86,16 +94,33 @@ erDiagram
     %% Challenge Structure (Level 3)
     ChallengeType {
         string id PK "cuid"
-        string name
+        string name "unique"
     }
 
-    Challenges {
+    Challenge {
         string id PK "cuid"
         string name
-        string challengeImage
+        string description "nullable"
         ChallengeDifficulty difficulty "enum"
-        json AppsConfig "Complex JSON ↓"
         string challengeTypeId FK
+        string cdf_version "nullable"
+        json cdf_content "nullable"
+        string pack_id "nullable"
+        string pack_challenge_id "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    ChallengePack {
+        string id PK "cuid"
+        string name
+        string description "nullable"
+        string version
+        string author "nullable"
+        string license "nullable"
+        string website "nullable"
+        datetime installed_date
+        datetime updatedAt
     }
 
     GroupChallenge {
@@ -110,13 +135,17 @@ erDiagram
     %% Challenge Instances (Level 4)
     ChallengeInstance {
         string id PK "uuid"
-        string challengeId
+        string challengeId FK
         string userId FK
-        string challengeImage
         string challengeUrl
-        string status
-        string flagSecretName
-        string flag
+        ChallengeStatus status "enum"
+        int terminationAttempts
+        datetime lastStatusChange
+        string flagSecretName "nullable"
+        string flag "nullable"
+        string competitionId FK
+        string k8s_instance_name "nullable"
+        datetime creationTime
     }
 
     %% Progress and Points (Level 5)
@@ -137,52 +166,75 @@ erDiagram
         datetime updatedAt
     }
 
-    %% AppsConfig Structure Details
-    AppsConfig {
-        json apps "Array of App objects"
+    %% Questions and Attempts
+    ChallengeQuestion {
+        string id PK "cuid"
+        string challengeId FK
+        string content
+        string type
+        int points
+        string answer "nullable"
+        int order
+        string title "nullable"
+        string format "nullable"
+        string hint "nullable"
+        boolean required
+        string cdf_question_id "nullable"
+        json cdf_payload "nullable"
+        datetime createdAt
+        datetime updatedAt
     }
 
-    App {
-        string id "unique identifier"
-        string icon "path to icon"
-        string title "display name"
-        int width "window width"
-        int height "window height"
-        string screen "display function"
-        boolean disabled "app state"
-        boolean favourite "app preference"
-        boolean desktop_shortcut "show on desktop"
-        boolean launch_on_startup "auto launch"
+    QuestionAttempt {
+        string id PK "cuid"
+        string questionId FK
+        string userId FK
+        string groupChallengeId FK
+        datetime attemptedAt
+        string answer
+        boolean isCorrect
     }
 
-    AppProperties {
-        boolean disableScrolling "terminal only"
-        string url "web_chal only"
+    QuestionCompletion {
+        string id PK "cuid"
+        string questionId FK
+        string userId FK
+        string groupChallengeId FK
+        datetime completedAt
+        int pointsEarned
     }
 
-    ChallengePrompt {
-        string description "challenge description"
-        json challenge "challenge details"
+    %% App Configuration
+    ChallengeAppConfig {
+        string id PK "cuid"
+        string challengeId FK
+        string appId
+        string title
+        string icon
+        int width
+        int height
+        string screen
+        boolean disabled
+        boolean favourite
+        boolean desktop_shortcut
+        boolean launch_on_startup
+        json additional_config "nullable"
+        datetime createdAt
+        datetime updatedAt
     }
 
-    Challenge {
-        string type "e.g., 'single'"
-        string title "challenge title"
-        string description "detailed description"
-        string flagSecretName "secret reference"
-        array pages "question pages"
-    }
-
-    Page {
-        string instructions "page instructions"
-        array questions "array of questions"
-    }
-
-    Question {
-        string type "question type"
-        string content "question text"
-        string id "question identifier"
-        int points "point value"
+    %% Activity Logging
+    ActivityLog {
+        string id PK "cuid" 
+        ActivityEventType eventType "enum"
+        string userId FK
+        string challengeId "nullable"
+        string groupId "nullable"
+        json metadata
+        datetime timestamp
+        string accessCodeId "nullable"
+        string challengeInstanceId "nullable"
+        LogSeverity severity "enum"
     }
 
 ```

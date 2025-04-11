@@ -1,0 +1,201 @@
+# EDURange Cloud Installation Guide
+
+This guide provides step-by-step instructions for installing and configuring EDURange Cloud using the EDURange Cloud Installer.
+
+## Prerequisites
+
+Before you begin, ensure you have the following:
+
+- A Kubernetes cluster (local or cloud-based)
+- `kubectl` installed and configured to access your cluster
+- `helm` installed (version 3.x or later)
+- Docker installed (for building and pushing images)
+- A domain name that you control (for setting up ingress and SSL certificates)
+- A Cloudflare account (for DNS management and SSL certificate issuance)
+
+## Building the Installer from Source
+
+To avoid code signing issues, you can build the EDURange Cloud Installer from source:
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/edurange/edurange-cloud-installer.git
+   cd edurange-cloud-installer
+   ```
+
+2. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Install Renderer Dependencies**:
+   ```bash
+   cd src/renderer
+   npm install
+   cd ../..
+   ```
+
+4. **Build the Installer**:
+   ```bash
+   # For macOS
+   npm run build:mac
+
+   # For Windows
+   npm run build:win
+
+   # For Linux
+   npm run build:linux
+   ```
+
+5. **Locate the Built Installer**:
+   - macOS: `dist/EDURange Cloud Installer-x.x.x.dmg`
+   - Windows: `dist/EDURange Cloud Installer-x.x.x.exe`
+   - Linux: `dist/EDURange Cloud Installer-x.x.x.AppImage`
+
+Building from source ensures that the application is signed with your own developer identity, avoiding code signing warnings and restrictions.
+
+## Installation Steps
+
+After building the installer from source, follow these steps to install EDURange Cloud:
+
+### 1. Launch the Installer
+
+Open the installer application you built in the previous section. You'll be presented with a welcome screen that provides an overview of the installation process.
+
+### 2. Kubectl Setup
+
+The first step is to ensure your kubectl is properly configured:
+
+1. Select your cloud provider from the dropdown menu
+2. Follow the provider-specific instructions to configure kubectl
+3. Click "Verify Connection" to ensure the installer can communicate with your Kubernetes cluster
+4. Click "Next" to proceed
+
+### 3. Prerequisites Check
+
+The installer will check if all required tools are installed:
+
+1. Wait for the checks to complete
+2. If any prerequisites are missing, follow the instructions to install them
+3. Click "Verify Again" if needed
+4. Click "Next" when all prerequisites are satisfied
+
+### 4. Domain Setup
+
+Configure your domain settings:
+
+1. Enter your domain name (e.g., `example.com`)
+2. Enter your Cloudflare API token (create one with Zone:DNS:Edit and Zone:Zone:Read permissions)
+3. Customize the subdomains if needed (defaults are recommended)
+4. Click "Next" to proceed
+
+### 5. Ingress Setup
+
+Install the NGINX Ingress Controller:
+
+1. Click "Install Ingress Controller"
+2. Wait for the installation to complete
+3. The installer will display the external IP address assigned to your ingress controller
+4. Create an A record in your Cloudflare DNS settings pointing to this IP address
+5. Wait for DNS propagation (the installer will check automatically)
+6. Click "Next" when DNS propagation is complete
+
+### 6. Certificate Setup
+
+Install cert-manager and configure SSL certificates:
+
+1. Click "Install cert-manager"
+2. Wait for the installation to complete
+3. The installer will create a ClusterIssuer for Let's Encrypt
+4. A wildcard certificate for your domain will be requested
+5. Wait for the certificate to be issued
+6. Click "Next" when the certificate is ready
+
+### 7. Database Setup
+
+Set up the PostgreSQL database:
+
+1. Choose between installing a new in-cluster database or using an existing external database
+2. If using an in-cluster database, click "Install Database"
+3. If using an external database, enter the connection details
+4. Wait for the database to be ready
+5. Click "Next" to proceed
+
+### 8. Components Setup
+
+Install the core EDURange Cloud components:
+
+1. Click "Install Database Controller"
+2. Wait for the installation to complete
+3. Click "Install Instance Manager"
+4. Wait for the installation to complete
+5. Click "Install Monitoring Service"
+6. Wait for the installation to complete
+7. Click "Next" to proceed
+
+### 9. OAuth Setup
+
+Configure OAuth for user authentication:
+
+1. Create a new OAuth application in GitHub
+2. Set the homepage URL to `https://dashboard.yourdomain.com`
+3. Set the callback URL to `https://dashboard.yourdomain.com/api/auth/callback/github`
+4. Enter the Client ID and Client Secret in the installer
+5. Click "Save OAuth Configuration"
+6. Click "Next" to proceed
+
+### 10. Dashboard Setup
+
+Install the EDURange Cloud dashboard:
+
+1. Click "Install Dashboard"
+2. Wait for the installation to complete
+3. Click "Next" to proceed
+
+### 11. User Management
+
+Set up the initial admin user:
+
+1. Log in to the dashboard using GitHub authentication
+2. Return to the installer
+3. Click "Fetch Users"
+4. Select your user from the list
+5. Click "Grant Admin Access"
+6. Click "Next" to proceed
+
+### 12. Verification
+
+Verify that all components are working correctly:
+
+1. The installer will check the status of all components
+2. Green checkmarks indicate properly functioning components
+3. Click "Verify Again" if needed
+4. Click "Next" when all components are verified
+
+### 13. Completion
+
+The installation is now complete:
+
+1. The installer will display URLs for accessing the various components
+2. Bookmark these URLs for future reference
+3. Click "Finish" to close the installer
+
+## Post-Installation
+
+After completing the installation:
+
+1. Log in to the dashboard at `https://dashboard.yourdomain.com`
+2. Create your first challenge
+3. Invite users to join your EDURange Cloud instance
+
+## Troubleshooting
+
+If you encounter issues during installation:
+
+- Check the logs displayed in the installer for error messages
+- Ensure all prerequisites are properly installed
+- Verify that your Kubernetes cluster has sufficient resources
+- Check that your Cloudflare API token has the correct permissions
+- Ensure your domain's DNS settings are properly configured
+
+For additional help, visit the [EDURange Cloud GitHub repository](https://github.com/edurange/edurange-cloud) or join our community Discord server.

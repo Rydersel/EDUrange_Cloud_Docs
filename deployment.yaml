@@ -16,7 +16,7 @@ spec:
       serviceAccountName: default
       containers:
       - name: docs
-        image: registry.rydersel.cloud/docs
+        image: registry.edurange.cloud/edurange/docs
         ports:
         - containerPort: 3000
 ---
@@ -45,7 +45,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: docs.rydersel.cloud
+  - host: docs.edurange.cloud
     http:
       paths:
       - path: /
@@ -57,5 +57,5 @@ spec:
               number: 80
   tls:
     - hosts:
-        - docs.rydersel.cloud
+        - docs.edurange.cloud
       secretName: wildcard-domain-certificate-prod

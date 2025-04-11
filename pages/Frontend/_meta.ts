@@ -1,10 +1,9 @@
 const page = {
   auth : 'Authentication',
-  activity_logging : 'Activity Logging',
   API : 'API',
+  activity_logging : 'Activity Logging',
   AppConfig : 'App Config',
   ui_design : 'UI Design',
-  challenge_installer : 'Challenge Installer',
   Testing : 'Testing',
 
 

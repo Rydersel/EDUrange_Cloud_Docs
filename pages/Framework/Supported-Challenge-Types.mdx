@@ -18,6 +18,18 @@ This document outlines the currently supported and planned challenge types in ED
 - **Use Cases**: SQL injection, XSS, CSRF, and other web vulnerabilities
 - **Implementation**: Uses containerized web servers with vulnerable applications
 
+### SQL Injection Challenges
+![SUPPORTED](https://img.shields.io/badge/SUPPORTED-28a745)
+
+- **Description**: Specialized database challenges focusing on SQL injection vulnerabilities
+- **Use Cases**: Database security, input validation, query manipulation, authentication bypass
+- **Implementation**: Uses containerized database servers with vulnerable web interfaces for SQL interaction
+- **Key Features**:
+  - Interactive SQL interface for query execution
+  - Database visualization tools
+  - Progress tracking through multiple vulnerability types
+  - Comprehensive learning material on SQL injection techniques
+
 ### Attack/Defend
 ![SUPPORTED](https://img.shields.io/badge/SUPPORTED-28a745)
 
@@ -34,6 +46,14 @@ This document outlines the currently supported and planned challenge types in ED
 - **Use Cases**: Privilege escalation, container escape challenges
 - **Implementation**: Uses containerized OS with restricted permissions and escape monitoring
 
+### Packet Analysis
+![IN DEVELOPMENT](https://img.shields.io/badge/IN%20DEVELOPMENT-ffeb3b)
+
+- **Description**: Network packet capture and analysis challenges
+- **Use Cases**: Network forensics, protocol analysis, traffic monitoring
+- **Implementation**: Uses WebShark, a browser-based packet analysis tool
+- **Status**: Currently in Alpha stage, with active development ongoing
+
 ### Reverse Engineering Challenges
 ![IN DEVELOPMENT](https://img.shields.io/badge/IN%20DEVELOPMENT-ffeb3b)
 
@@ -43,13 +63,6 @@ This document outlines the currently supported and planned challenge types in ED
 
 ## Planned Future Additions
 
-### Packet Analysis (Via CloudShark)
-![PLANNED](https://img.shields.io/badge/PLANNED-9c27b0)
-
-- **Description**: Network packet capture and analysis challenges
-- **Use Cases**: Network forensics, protocol analysis, traffic monitoring
-- **Implementation**: Will integrate with CloudShark for web-based packet analysis
-
 ### Cryptography Challenges
 ![PLANNED](https://img.shields.io/badge/PLANNED-9c27b0)
 
@@ -57,6 +70,27 @@ This document outlines the currently supported and planned challenge types in ED
 - **Use Cases**: Encryption/decryption, hash cracking, cryptanalysis
 - **Implementation**: Will use specialized containers with cryptographic tools and challenges
 
+### Digital Forensics
+![PLANNED](https://img.shields.io/badge/PLANNED-9c27b0)
+
+- **Description**: Challenges focused on digital forensics techniques
+- **Use Cases**: File system analysis, memory forensics, artifact extraction
+- **Implementation**: Will use specialized containers with forensic tools and evidence files
+
+### Mobile Security
+![PLANNED](https://img.shields.io/badge/PLANNED-9c27b0)
+
+- **Description**: Challenges focused on mobile application security
+- **Use Cases**: Android/iOS security, application analysis, vulnerability identification
+- **Implementation**: Will use emulated mobile environments for security analysis
+
+### IoT Security
+![PLANNED](https://img.shields.io/badge/PLANNED-9c27b0)
+
+- **Description**: Challenges focused on Internet of Things security
+- **Use Cases**: Device security, protocol analysis, firmware examination
+- **Implementation**: Will use simulated IoT devices and protocols for security analysis
+
 ## Custom Challenge Types
 
-EDUrange Cloud's modular architecture allows for the creation of custom challenge types. Users can develop their own challenge containers and integrate them with the platform. For more information on creating custom challenges, see the [Modules](Modules) documentation.
+EDURange Cloud's modular architecture allows for the creation of custom challenge types. Users can develop their own challenge containers and integrate them with the platform using Challenge Type Definitions (CTDs). For more information on creating custom challenges, see the [Challenge Development](Challenge_Development) documentation.

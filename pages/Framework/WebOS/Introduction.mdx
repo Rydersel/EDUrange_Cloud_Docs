@@ -1,0 +1,72 @@
+![WebOS](https://raw.githubusercontent.com/Rydersel/EDUrange_Cloud/master/assets/WebOS1.png?width=760)
+
+# EDURange WebOS
+
+## Introduction
+
+EDURange WebOS is a browser-based desktop environment that provides a consistent interface for cybersecurity challenges. Built with Next.js, React, and Tailwind CSS, it mimics the look and feel of modern operating systems to create a familiar experience for users. The WebOS serves as the primary interface for users to interact with challenges, providing a standardized environment regardless of the underlying challenge type.
+
+## Documentation Sections
+
+The WebOS documentation is split into several sections for better organization:
+
+1. **[Architecture and Components](WebOS-Architecture)** - Detailed information about the WebOS architecture, core components, and communication patterns.
+
+2. **[Applications and Configuration](WebOS-Applications)** - Documentation on WebOS applications, their configuration through CDF, and challenge type-specific setups.
+
+3. **[Security and Performance](WebOS-Security)** - Information about security features, rate limiting, and performance optimization techniques.
+
+4. **[Performance Monitoring](WebOS-Performance-Monitoring)** - Detailed documentation on the performance monitoring system for development and optimization.
+
+## Key Features
+
+- **Unified Interface**: Consistent user experience across all challenge types
+- **Component-Based Architecture**: Modular design with extensible components
+- **Integration with CDF**: Configurable through the Challenge Definition Format
+- **Dynamic Application Loading**: Applications loaded based on challenge requirements
+- **Security Measures**: Rate limiting and other security protections
+- **Modern UI**: Desktop-like interface with windows, menus, and applications
+- **Performance Monitoring**: Built-in tools for monitoring and optimization
+
+## Development Setup
+
+To set up a development environment for WebOS:
+
+1. Clone the repository:
+    ```bash
+    git clone https://github.com/Rydersel/EDUrange_Cloud.git
+    ```
+
+2. Navigate to the WebOS directory:
+    ```bash
+   cd EDURange_Cloud/webos-app
+    ```
+
+3. Install dependencies:
+    ```bash
+    npm install
+    ```
+
+4. Start the development server:
+    ```bash
+    npm run dev
+    ```
+
+5. Access WebOS at http://localhost:3000
+
+## Best Practices for Development
+
+1. **Component Structure**:
+   - Use functional components with hooks
+   - Apply memoization (React.memo) to prevent unnecessary re-renders
+   - Implement useCallback for event handlers
+   - Use proper dependency arrays in useEffect
+
+2. **State Management**:
+   - Prefer useState and useReducer for component state
+   - Use context for shared state where appropriate
+   - Consider Zustand for more complex state requirements
+   - Avoid prop drilling through deep component hierarchies
+
+For more detailed information, please refer to the specific documentation sections linked above.
+

@@ -1,0 +1,87 @@
+# Integration Tests
+
+These tests verify the interaction between different components of the system with actual database operations.
+
+## Challenge Management
+
+**File:** `integration/challenges.test.ts`
+
+**What it tests:**
+- Challenge creation with different configurations
+- Challenge type management
+- Challenge question creation and validation
+- Challenge assignment to competition groups
+
+**Mocked vs. Live Data:**
+- **Mocked:** None (uses real database transactions that are rolled back)
+- **Live:**
+  - Database operations via Prisma
+  - Business logic for challenge management
+
+## Group Management
+
+**File:** `integration/groups.test.ts`
+
+**What it tests:**
+- Competition group creation and configuration
+- Instructor assignment to groups
+- Student membership management
+- Access code generation and usage
+- Group details updates
+
+**Mocked vs. Live Data:**
+- **Mocked:** None (uses real database transactions that are rolled back)
+- **Live:**
+  - Database operations via Prisma
+  - Business logic for group management
+
+## Event Logging
+
+**File:** `integration/events.test.ts`
+
+**What it tests:**
+- User event logging (registration, login, updates)
+- Group event logging (creation, membership changes)
+- Challenge event logging (starts, completions)
+- Access code event logging
+- Proper event metadata validation
+
+**Mocked vs. Live Data:**
+- **Mocked:** None (uses real database transactions that are rolled back)
+- **Live:**
+  - Database operations via Prisma
+  - Activity logging system
+
+## Competition Isolation
+
+**File:** `integration/competition-isolation.test.ts`
+
+**What it tests:**
+- Points isolation between competitions
+- Challenge instance isolation
+- Question completion isolation
+- Data integrity across competitions
+
+**Mocked vs. Live Data:**
+- **Mocked:** None (uses real database transactions that are rolled back)
+- **Live:**
+  - Database operations via Prisma
+  - Business logic for competition isolation
+
+## Challenge Submission
+
+**File:** `integration/challenge-submission.test.ts`
+
+**What it tests:**
+- Correct flag submission and points awarding
+- Incorrect flag submission handling
+- Case-sensitive flag validation
+- Multiple submission attempts tracking
+- Challenge completion status updates
+- Partial credit for multi-part challenges
+
+**Mocked vs. Live Data:**
+- **Mocked:** None (uses real database transactions that are rolled back)
+- **Live:**
+  - Database operations via Prisma
+  - Business logic for challenge submission 

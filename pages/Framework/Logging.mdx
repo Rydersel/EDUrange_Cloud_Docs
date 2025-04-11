@@ -1,0 +1,125 @@
+# Logging Utility
+
+The EDURange Cloud platform includes a logging utility that provides environment-aware logging capabilities. This utility helps prevent sensitive information from being exposed in production environments while still providing detailed logs during development.
+
+## Overview
+
+The logging utility is implemented in `dashboard/lib/logger.ts` and provides three main functions:
+
+- `devLog`: For development-only logging
+- `errorLog`: For error logging with environment-aware sanitization
+- `warnLog`: For warning logging with environment-aware sanitization
+
+## Usage
+
+### Development-Only Logging
+
+The `devLog` function is designed to only output logs in development environments. In production, these logs are completely suppressed.
+
+```typescript
+import { devLog } from '@/lib/logger';
+
+// This will only appear in development, not in production
+devLog('User session data:', session);
+devLog('API response:', response);
+```
+
+### Error Logging
+
+The `errorLog` function logs errors in all environments but sanitizes sensitive data in production.
+
+```typescript
+import { errorLog } from '@/lib/logger';
+
+try {
+  // Some operation that might fail
+} catch (error) {
+  // In development: logs both the message and full error details
+  // In production: logs only the message without sensitive details
+  errorLog('Failed to fetch user data', error);
+}
+```
+
+### Warning Logging
+
+The `warnLog` function logs warnings in all environments but sanitizes sensitive data in production.
+
+```typescript
+import { warnLog } from '@/lib/logger';
+
+// In development: logs both the message and full data
+// In production: logs only the warning message without sensitive details
+warnLog('User session about to expire', userData);
+```
+
+## Implementation Details
+
+The logging utility uses the `NODE_ENV` environment variable to determine the current environment:
+
+```typescript
+export const devLog = (...args: any[]): void => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(...args);
+  }
+};
+
+export const errorLog = (message: string, error?: any): void => {
+  if (process.env.NODE_ENV === 'production') {
+    // In production, log only the error message without sensitive details
+    console.error(message);
+  } else {
+    // In development, log full error details
+    console.error(message, error);
+  }
+};
+
+export const warnLog = (message: string, data?: any): void => {
+  if (process.env.NODE_ENV === 'production') {
+    // In production, log only the warning message without sensitive details
+    console.warn(message);
+  } else {
+    // In development, log full warning details
+    console.warn(message, data);
+  }
+};
+```
+
+## Best Practices
+
+1. **Use `devLog` for debugging information**
+   - Any information that is only useful during development should use `devLog`
+   - This includes session data, API responses, and other potentially sensitive information
+
+2. **Use `errorLog` for error handling**
+   - Always include a descriptive message as the first parameter
+   - Pass the actual error object as the second parameter
+
+3. **Use `warnLog` for non-critical issues**
+   - Use for situations that aren't errors but might need attention
+   - Useful for deprecation notices or potential issues
+
+4. **Never log sensitive information directly**
+   - Always use the logging utility instead of direct `console.log` calls
+   - Be mindful of what information might be sensitive (user data, tokens, etc.)
+
+## Components Using the Logging Utility
+
+The following components have been updated to use the logging utility:
+
+- `MainNavigation`: Uses `devLog` to prevent logging sensitive session information in production
+- `dashboard-nav`: Uses `devLog` for navigation state logging
+- `NewChallengeForm`: Uses `devLog` and `errorLog` for challenge data logging
+- `create-profile`: Uses `devLog` for form data logging
+- `ChallengeItem`: Uses `devLog` for URL availability checks
+- `DancingFrog`: Uses `devLog` and `errorLog` for animation and audio logging
+
+## Security Benefits
+
+By implementing this logging utility, EDURange Cloud gains several security benefits:
+
+1. **Reduced exposure of sensitive data** in production environments
+2. **Consistent logging behavior** across the application
+3. **Simplified debugging** in development without compromising production security
+4. **Compliance with security best practices** by not exposing internal details in production logs
+
+This approach aligns with the platform's goal of providing a secure, educational environment for cybersecurity training. 

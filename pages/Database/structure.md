@@ -1,18 +1,155 @@
-# EDURange Cloud Database Structure
+# Database Structure
 
 ## Overview
 
-EDURange Cloud uses a PostgreSQL database managed through Prisma ORM. The database serves as the central data store for the platform, handling user information, challenges, competitions, and activity tracking. The database is designed to support the educational cybersecurity platform with a focus on competition management and challenge tracking.
+The EDURange Cloud database is a PostgreSQL database that stores all persistent data for the platform. It is designed to support the platform's core features, including user management, challenge configuration, competitions, and activity tracking.
+
+## Database Organization
+
+The database is organized into several logical groups of tables, each serving a specific purpose in the system:
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '14px', 'primaryTextColor': '#ffffff' }, 'flowchart': {'useMaxWidth': true, 'diagramPadding': 30, 'curve': 'basis'}, 'securityLevel': 'loose'}}%%
+graph TD
+    %% Core entities
+    User[User & Authentication]
+    Challenges[Challenge System]
+    Competition[Competition Groups]
+    Instances[Challenge Instances]
+    Tracking[Activity Tracking]
+    
+    %% Main relationships
+    User <--> Competition
+    User --> Instances
+    User --> Tracking
+    
+    Challenges --> Instances
+    Challenges <--> Competition
+    
+    Instances --> Tracking
+    Competition --> Tracking
+```
+
+### User Management
+
+Tables related to user accounts, authentication, and sessions.
+
+* **User**: Core user information including name, email, and role
+* **Account**: OAuth accounts linked to users
+* **Session**: User session information
+* **VerificationToken**: Tokens for email verification and password reset
+
+### Challenge Management
+
+Tables related to challenge definition and configuration.
+
+* **Challenge**: Core challenge information including name, description, and difficulty
+* **ChallengeType**: Types of challenges (e.g., FullOS, Web, SQL, etc.)
+* **ChallengeQuestion**: Questions associated with challenges
+* **ChallengeAppConfig**: WebOS application configurations for challenges
+* **ChallengePack**: Collections of related challenges packaged together
+
+### Competition Management
+
+Tables related to organizing competitions and managing groups.
+
+* **CompetitionGroup**: Groups or classes for organizing competitions
+* **GroupChallenge**: Challenges assigned to competition groups with point values
+* **CompetitionAccessCode**: Access codes for joining competition groups
+* **GroupPoints**: Points earned by users within competition groups
+
+### Challenge Execution
+
+Tables related to running challenge instances.
+
+* **ChallengeInstance**: Running instances of challenges for specific users
+
+### Activity Tracking
+
+Tables related to tracking user activity and progress.
+
+* **ActivityLog**: Comprehensive event logging
+* **ChallengeCompletion**: Records of completed challenges
+* **QuestionCompletion**: Records of completed questions
+* **QuestionAttempt**: Records of attempts to answer questions
+
+## Challenge Definition Format (CDF) Integration
+
+The database schema includes support for the Challenge Definition Format (CDF), which is a standardized way to define and package challenges.
+
+### CDF-Related Fields
+
+* **Challenge.cdf_version**: Version of the CDF used
+* **Challenge.cdf_content**: Complete CDF definition stored as JSON
+* **Challenge.pack_id**: Reference to the challenge pack
+* **Challenge.pack_challenge_id**: Identifier within the challenge pack
+* **ChallengeQuestion.cdf_question_id**: ID of the question in the CDF
+* **ChallengeQuestion.cdf_payload**: Additional CDF-specific data for questions
+
+### Challenge Packs
+
+Challenge packs allow for bundling multiple related challenges together. The ChallengePack table stores metadata about these packs:
+
+* **name**: Human-readable name
+* **description**: Detailed description
+* **version**: Version number
+* **author**: Author information
+* **license**: License information
+* **website**: URL for more information
+* **installed_date**: When the pack was installed
+* **updatedAt**: When the pack was last updated
+
+## Data Access Patterns
+
+The database is accessed through several patterns depending on the component:
+
+1. **ORM Access**: The Dashboard and Database Controller use Prisma ORM to access the database directly.
+2. **API Access**: The Instance Manager and other components access the database through the Database API.
+3. **Connection Pooling**: Non-critical components use PgBouncer for connection pooling.
+4. **Direct Access**: The Database Controller uses direct connections for critical operations.
+
+## Relationships and Foreign Keys
+
+The database uses foreign keys extensively to maintain referential integrity between related tables. Key relationships include:
+
+* Users belong to competition groups through many-to-many relationships
+* Challenges are assigned to competition groups through the GroupChallenge table
+* Challenge instances are linked to specific users and competition groups
+* Activity logs are linked to relevant users, challenges, and competition groups
+* Questions are linked to challenges
+* Completions and attempts are linked to users, questions, and group challenges
+
+## Data Migration
+
+Database migrations are managed through Prisma Migrate, which provides:
+
+1. **Version Control**: Migration files are tracked in source control
+2. **Schema Evolution**: Controlled changes to the database schema
+3. **Data Migration**: Safe migration of data between schema versions
+4. **Rollback Support**: Ability to roll back changes when necessary
+
+## Performance Considerations
+
+The database schema is designed with performance in mind:
+
+1. **Indexing**: Foreign keys and frequently queried fields are indexed
+2. **Denormalization**: Selected data is denormalized for query performance
+3. **JSON Storage**: Complex data is stored in JSON fields for flexibility
+4. **Query Optimization**: Common queries are optimized through careful schema design
+5. **Connection Management**: Different connection strategies for different access patterns
 
 ## Architecture
 
-The database system consists of three main components:
+The database system consists of four main components:
 
 1. **PostgreSQL Database**: The primary data store running as a standalone service
-2. **Database API**: REST API for database interactions
-3. **Database Sync**: Background service that synchronizes Kubernetes pod state with the database
+2. **PgBouncer Connection Pooling**: Manages database connections to improve performance and scalability
+3. **Database API**: REST API for database interactions
+4. **Database Sync**: Background service that synchronizes Kubernetes pod state with the database
 
-These components run in the Kubernetes cluster as part of the `database-controller` deployment.
+These components run in the Kubernetes cluster, with the Database API and Sync services part of the `database-controller` deployment, and PgBouncer running as a separate deployment.
+
+For detailed information about connection pooling and how it's implemented in EDURange Cloud, see the [Connection Pooling documentation](./connection_pooling.md).
 
 ## Core Entities
 

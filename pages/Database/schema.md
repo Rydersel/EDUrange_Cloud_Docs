@@ -10,12 +10,17 @@ EDURange Cloud uses a PostgreSQL database with Prisma ORM to manage data. The sc
 erDiagram
     User ||--o{ ChallengeInstance : "has"
     User }o--o{ CompetitionGroup : "member of"
+    User ||--o{ GroupPoints : "has points in"
     
     CompetitionGroup ||--o{ GroupChallenge : "has"
     CompetitionGroup ||--o{ CompetitionAccessCode : "has"
+    CompetitionGroup ||--o{ GroupPoints : "tracks points for"
     
-    Challenges ||--o{ ChallengeQuestion : "has"
-    Challenges ||--o{ GroupChallenge : "assigned to"
+    Challenge ||--o{ ChallengeQuestion : "has"
+    Challenge ||--o{ GroupChallenge : "assigned to"
+    Challenge ||--o{ ChallengeAppConfig : "has"
+    Challenge }o--|| ChallengeType : "has type"
+    Challenge }o--o| ChallengePack : "belongs to"
     
     ChallengeInstance }|--|| User : "belongs to"
     ChallengeInstance }|--|| CompetitionGroup : "belongs to"
@@ -27,7 +32,7 @@ This diagram shows the main entities and their primary relationships. For a more
 
 The diagram uses standard Entity-Relationship (ER) notation with the following symbols:
 
-- **Entities**: Rectangles representing database tables (e.g., `User`, `Challenges`)
+- **Entities**: Rectangles representing database tables (e.g., `User`, `Challenge`)
 - **Relationships**: Lines connecting entities with symbols at each end indicating the type of relationship
 - **Relationship Text**: Describes the nature of the relationship (e.g., "has", "belongs to")
 
@@ -35,6 +40,7 @@ The diagram uses standard Entity-Relationship (ER) notation with the following s
 - `||--o{` : One-to-many relationship (e.g., one User has many ChallengeInstances)
 - `}o--o{` : Many-to-many relationship (e.g., Users can be members of many CompetitionGroups)
 - `}|--||` : Many-to-one relationship (e.g., many ChallengeInstances belong to one User)
+- `}o--o|` : Many-to-optional one relationship (e.g., Challenges may belong to a ChallengePack)
 
 **Cardinality Notation:**
 - `||` : Exactly one
@@ -64,8 +70,12 @@ The `User` model represents users of the platform with different roles.
 - Has many `Session` records
 - Has many `ActivityLog` records
 - Has many `ChallengeInstance` records
+- Has many `GroupPoints` records
 - Can be an instructor in many `CompetitionGroup` records
 - Can be a member of many `CompetitionGroup` records
+- Has many `ChallengeCompletion` records
+- Has many `QuestionCompletion` records
+- Has many `QuestionAttempt` records
 
 ### CompetitionGroup
 
@@ -86,10 +96,11 @@ Represents a group or class for competitions and challenges.
 - Has many `GroupChallenge` records
 - Has many `ChallengeInstance` records
 - Has many `ActivityLog` records
+- Has many `GroupPoints` records
 - Has many instructors (Users with INSTRUCTOR role)
 - Has many members (Users with any role)
 
-### Challenges
+### Challenge
 
 Represents a challenge template that can be added to competition groups.
 
@@ -97,10 +108,15 @@ Represents a challenge template that can be added to competition groups.
 |-------|------|-------------|
 | id | String | Unique identifier (CUID) |
 | name | String | Challenge name |
-| challengeImage | String | Docker image for the challenge |
-| difficulty | ChallengeDifficulty | Difficulty level (EASY, MEDIUM, HARD, VERY_HARD) |
-| challengeTypeId | String | Reference to challenge type |
 | description | String? | Challenge description |
+| difficulty | ChallengeDifficulty? | Difficulty level (EASY, MEDIUM, HARD, VERY_HARD) |
+| challengeTypeId | String | Reference to challenge type |
+| createdAt | DateTime | When the challenge was created |
+| updatedAt | DateTime | When the challenge was last updated |
+| cdf_version | String? | Version of the Challenge Definition Format |
+| cdf_content | Json? | Full CDF definition as JSON |
+| pack_id | String? | Reference to the challenge pack |
+| pack_challenge_id | String? | Identifier within the challenge pack |
 
 **Relationships:**
 - Has many `ChallengeQuestion` records
@@ -108,6 +124,26 @@ Represents a challenge template that can be added to competition groups.
 - Has many `GroupChallenge` records
 - Has many `ActivityLog` records
 - Belongs to a `ChallengeType`
+- May belong to a `ChallengePack`
+
+### ChallengePack
+
+Represents a collection of related challenges packaged together.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Unique identifier (CUID) |
+| name | String | Human-readable name of the pack |
+| description | String? | Description of the challenge pack |
+| version | String | Version of the challenge pack |
+| author | String? | Author of the challenge pack |
+| license | String? | License information |
+| website | String? | Website URL for the pack |
+| installed_date | DateTime | When the pack was installed |
+| updatedAt | DateTime | When the pack was last updated |
+
+**Relationships:**
+- Has many `Challenge` records
 
 ### ChallengeInstance
 
@@ -118,13 +154,15 @@ Represents a running instance of a challenge for a specific user.
 | id | String | Unique identifier (UUID) |
 | challengeId | String | Challenge identifier |
 | userId | String | User identifier |
-| challengeImage | String | Docker image used |
 | challengeUrl | String | URL to access the challenge |
 | creationTime | DateTime | When the instance was created |
-| status | String | Current status of the instance |
-| flagSecretName | String | Name of the secret containing the flag |
-| flag | String | The challenge flag |
+| status | ChallengeStatus | Current status (CREATING, ACTIVE, TERMINATING, TERMINATED, ERROR) |
+| terminationAttempts | Int | Number of termination attempts |
+| lastStatusChange | DateTime | When the status last changed |
+| flagSecretName | String? | Name of the secret containing the flag |
+| flag | String? | The challenge flag |
 | competitionId | String | Competition group identifier |
+| k8s_instance_name | String? | Kubernetes instance name |
 
 **Relationships:**
 - Belongs to a `User`
@@ -147,7 +185,7 @@ Links challenges to competition groups with specific point values.
 | updatedAt | DateTime | When the record was last updated |
 
 **Relationships:**
-- Belongs to a `Challenges`
+- Belongs to a `Challenge`
 - Belongs to a `CompetitionGroup`
 - Has many `ChallengeCompletion` records
 - Has many `QuestionAttempt` records
@@ -164,34 +202,21 @@ Represents questions within a challenge.
 | content | String | Question content |
 | type | String | Question type |
 | points | Int | Points awarded for correct answer |
-| answer | String | Correct answer |
+| answer | String? | Correct answer |
 | order | Int | Display order |
+| title | String? | Question title |
+| format | String? | Format of the question |
+| hint | String? | Hint for the question |
+| required | Boolean | Whether the question is required |
+| cdf_question_id | String? | ID of the question in the CDF |
+| cdf_payload | Json? | Additional CDF data for the question |
 | createdAt | DateTime | When the question was created |
 | updatedAt | DateTime | When the question was last updated |
 
 **Relationships:**
-- Belongs to a `Challenges`
+- Belongs to a `Challenge`
 - Has many `QuestionAttempt` records
 - Has many `QuestionCompletion` records
-
-### CompetitionAccessCode
-
-Represents access codes for joining competition groups.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Unique identifier (CUID) |
-| code | String | Unique access code |
-| expiresAt | DateTime? | When the code expires |
-| maxUses | Int? | Maximum number of uses |
-| usedCount | Int | Current use count |
-| groupId | String | Competition group identifier |
-| createdAt | DateTime | When the code was created |
-| createdBy | String | User who created the code |
-
-**Relationships:**
-- Belongs to a `CompetitionGroup`
-- Has many `ActivityLog` records
 
 ### ChallengeAppConfig
 
@@ -212,9 +237,47 @@ Configures applications available within a challenge's WebOS environment.
 | desktop_shortcut | Boolean | Whether to show on desktop |
 | launch_on_startup | Boolean | Whether to launch on startup |
 | additional_config | Json? | Additional configuration |
+| createdAt | DateTime | When the record was created |
+| updatedAt | DateTime | When the record was last updated |
 
 **Relationships:**
-- Belongs to a `Challenges`
+- Belongs to a `Challenge`
+
+### CompetitionAccessCode
+
+Represents access codes for joining competition groups.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Unique identifier (CUID) |
+| code | String | Unique access code |
+| expiresAt | DateTime? | When the code expires |
+| maxUses | Int? | Maximum number of uses |
+| usedCount | Int | Current use count |
+| groupId | String | Competition group identifier |
+| createdAt | DateTime | When the code was created |
+| createdBy | String | User who created the code |
+
+**Relationships:**
+- Belongs to a `CompetitionGroup`
+- Has many `ActivityLog` records
+
+### GroupPoints
+
+Tracks points earned by users within a specific competition group.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Unique identifier (CUID) |
+| userId | String | User identifier |
+| groupId | String | Competition group identifier |
+| points | Int | Total points earned |
+| createdAt | DateTime | When the record was created |
+| updatedAt | DateTime | When the record was last updated |
+
+**Relationships:**
+- Belongs to a `User`
+- Belongs to a `CompetitionGroup`
 
 ## Tracking Entities
 
@@ -249,12 +312,12 @@ Tracks when users complete questions.
 
 **Relationships:**
 - Belongs to a `User`
-- Belongs to a `ChallengeQuestion`
 - Belongs to a `GroupChallenge`
+- Belongs to a `ChallengeQuestion`
 
 ### QuestionAttempt
 
-Tracks attempts to answer questions.
+Tracks attempts made by users to answer questions.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -263,39 +326,22 @@ Tracks attempts to answer questions.
 | userId | String | User identifier |
 | groupChallengeId | String | Group challenge identifier |
 | attemptedAt | DateTime | When the attempt was made |
-| answer | String | User's answer |
-| isCorrect | Boolean | Whether the answer was correct |
+| answer | String | The submitted answer |
+| correct | Boolean | Whether the answer was correct |
 
 **Relationships:**
 - Belongs to a `User`
-- Belongs to a `ChallengeQuestion`
 - Belongs to a `GroupChallenge`
-
-### GroupPoints
-
-Tracks points earned by users in competition groups.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Unique identifier (CUID) |
-| points | Int | Total points |
-| userId | String | User identifier |
-| groupId | String | Competition group identifier |
-| createdAt | DateTime | When the record was created |
-| updatedAt | DateTime | When the record was last updated |
-
-**Relationships:**
-- Belongs to a `User`
-- Belongs to a `CompetitionGroup`
+- Belongs to a `ChallengeQuestion`
 
 ### ActivityLog
 
-Comprehensive logging of system events.
+Tracks important events in the system.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | id | String | Unique identifier (CUID) |
-| eventType | ActivityEventType | Type of event |
+| eventType | ActivityEventType | Type of activity event |
 | userId | String | User identifier |
 | challengeId | String? | Challenge identifier |
 | groupId | String? | Competition group identifier |
@@ -303,81 +349,41 @@ Comprehensive logging of system events.
 | timestamp | DateTime | When the event occurred |
 | accessCodeId | String? | Access code identifier |
 | challengeInstanceId | String? | Challenge instance identifier |
-| severity | LogSeverity | Event severity (INFO, WARNING, ERROR, CRITICAL) |
+| severity | LogSeverity | Severity level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
 
 **Relationships:**
 - Belongs to a `User`
-- May belong to a `Challenges`
+- May belong to a `Challenge`
 - May belong to a `CompetitionGroup`
 - May belong to a `CompetitionAccessCode`
 - May belong to a `ChallengeInstance`
 
-## Authentication Entities
-
-### Account
-
-Links users to OAuth providers.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Unique identifier (CUID) |
-| userId | String | User identifier |
-| type | String | Account type |
-| provider | String | OAuth provider |
-| providerAccountId | String | Provider's account ID |
-| refresh_token | String? | OAuth refresh token |
-| access_token | String? | OAuth access token |
-| expires_at | Int? | Token expiration timestamp |
-| token_type | String? | OAuth token type |
-| scope | String? | OAuth scopes |
-| id_token | String? | OAuth ID token |
-| session_state | String? | OAuth session state |
-
-**Relationships:**
-- Belongs to a `User`
-
-### Session
-
-Manages user sessions.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Unique identifier (CUID) |
-| sessionToken | String | Unique session token |
-| userId | String | User identifier |
-| expires | DateTime | When the session expires |
-
-**Relationships:**
-- Belongs to a `User`
-
-### VerificationToken
-
-Used for email verification and password resets.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| identifier | String | User identifier (typically email) |
-| token | String | Unique verification token |
-| expires | DateTime | When the token expires |
-
 ## Enumerations
 
 ### UserRole
-- `ADMIN`: System administrators
-- `INSTRUCTOR`: Competition organizers and educators
-- `STUDENT`: Regular users participating in challenges
+- `ADMIN`: System administrator with full access
+- `INSTRUCTOR`: Can create and manage competition groups and challenges
+- `STUDENT`: Can join competition groups and participate in challenges
 
-### ActivityEventType
-- Various event types for system activities (e.g., `USER_REGISTERED`, `CHALLENGE_COMPLETED`)
-
-### LogSeverity
-- `INFO`: Informational events
-- `WARNING`: Potential issues
-- `ERROR`: Errors that don't prevent operation
-- `CRITICAL`: Critical errors that may affect system operation
+### ChallengeStatus
+- `CREATING`: Challenge instance is being created
+- `ACTIVE`: Challenge instance is running
+- `TERMINATING`: Challenge instance is being terminated
+- `TERMINATED`: Challenge instance has been terminated
+- `ERROR`: An error occurred with the challenge instance
 
 ### ChallengeDifficulty
-- `EASY`: Beginner-level challenges
-- `MEDIUM`: Intermediate challenges
-- `HARD`: Advanced challenges
-- `VERY_HARD`: Expert-level challenges 
+- `EASY`: Beginner-level challenge
+- `MEDIUM`: Intermediate-level challenge
+- `HARD`: Advanced-level challenge
+- `VERY_HARD`: Expert-level challenge
+
+### LogSeverity
+- `DEBUG`: Detailed information for debugging
+- `INFO`: General information about system operation
+- `WARNING`: Potential issues that don't affect system operation
+- `ERROR`: Errors that affect specific operations
+- `CRITICAL`: Critical errors that affect system operation
+
+### ActivityEventType
+Various event types including user registration, login, challenge starts, completions, etc. 
