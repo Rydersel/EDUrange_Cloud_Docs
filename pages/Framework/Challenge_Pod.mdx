@@ -2,32 +2,15 @@
 
 A Challenge Pod is a multi-container Kubernetes pod that provides an isolated environment where users can interact with and solve cybersecurity challenges. These pods are dynamically created and managed by the [Instance Manager](Instance_Manager) based on Challenge Definition Format (CDF) specifications and Challenge Type Definitions (CTDs).
 
-```mermaid
-graph TD
-    subgraph "Challenge Pod"
-        WebOS["WebOS Container<br/>(Next.js App)"]
-        RT["Remote-Terminal<br/>(Node.js App)"]
-        ChallengeOS["Challenge OS Container<br/>(Challenge Environment)"]
-    end
 
-    subgraph "External Access"
-        User["User Browser"]
-        Ingress["Kubernetes Ingress"]
-    end
 
-    subgraph "Challenge Resources"
-        Secret["Flag Secret"]
-        ConfigMap["Challenge ConfigMap"]
-    end
-
-    User -->|"HTTPS"| Ingress
-    Ingress -->|"WebOS URL"| WebOS
-    Ingress -->|"Terminal URL"| RT
-    RT -->|"Kubernetes API"| ChallengeOS
-    WebOS -->|"Apps Config"| RT
-    Secret --> WebOS
-    ConfigMap --> ChallengeOS
-```
+<div style={{ marginTop: "2rem" }}>
+  <img
+    src="/challenge-pod-diagram.svg"
+    alt="Challenge Pod Diagram"
+    style={{ display: "block", margin: "0 auto", maxWidth: "100%", height: "auto" }}
+  />
+</div>
 
 ## Pod Structure
 
@@ -48,6 +31,9 @@ Modern challenge pods consist primarily of three containers:
    - Exposes a WebSocket interface for real-time interaction
    - Requires specific service account permissions
    - Connected to WebOS via environment variables
+
+
+
 
 ## Challenge Type Specialization
 
@@ -119,24 +105,7 @@ Challenge pods are deployed through a multi-step process:
 5. Kubernetes resources (Pod, Service, Ingress, ConfigMap, Secret) are created
 6. URLs are generated and returned to the dashboard for user access
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Dashboard
-    participant IM as Instance Manager
-    participant K8s as Kubernetes API
-    participant Pod as Challenge Pod
 
-    User->>Dashboard: Start Challenge
-    Dashboard->>IM: POST /api/start-challenge with CDF
-    IM->>IM: Process CDF & load CTD
-    IM->>IM: Generate flags & variables
-    IM->>K8s: Create Pod, Service, Ingress
-    K8s->>Pod: Deploy Challenge Pod
-    IM->>Dashboard: Return URLs
-    Dashboard->>User: Provide Challenge Links
-    User->>Pod: Access via WebOS & Terminal
-```
 
 # Challenge Components
 

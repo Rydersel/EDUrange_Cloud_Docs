@@ -1,6 +1,6 @@
 # docker buildx build --platform linux/amd64 -t registry.edurange.cloud/edurange/docs . --push
 
-FROM node:18.18.0
+FROM node:20-alpine
 
 WORKDIR /app
 

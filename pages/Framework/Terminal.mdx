@@ -100,6 +100,465 @@ sequenceDiagram
     Browser-->>User: Show results
 ```
 
+### Network Architecture
+
+The Remote Terminal uses Server-Sent Events (SSE) for reliable, unidirectional streaming from server to client, and standard HTTP for client-to-server communication:
+
+```mermaid
+graph TD
+    subgraph "Client"
+        FE["Frontend Terminal<br>xterm.js"]
+        BatchIn["Input Batching<br>Module"]
+        SSEClient["SSE Client<br>EventSource"]
+        HTTPClient["HTTP Client<br>Fetch API"]
+    end
+
+    subgraph "Server"
+        Express["Express Server"]
+        SSEEndpoint["SSE Output<br>Endpoint"]
+        HTTPEndpoint["HTTP Input<br>Endpoint"]
+        BatchOut["Output Batching<br>Module"]
+        NetAdapt["Network Adaptation<br>Module"]
+        K8s["Kubernetes<br>API Client"]
+    end
+
+    subgraph "Kubernetes"
+        ExecAPI["Exec API"]
+        Pod["Challenge<br>Container"]
+    end
+
+    FE -->|"Terminal Input"| BatchIn
+    BatchIn -->|"Batched Input"| HTTPClient
+    HTTPClient -->|"POST /input"| HTTPEndpoint
+    HTTPEndpoint --> K8s
+    K8s -->|"Execute"| ExecAPI
+    ExecAPI -->|"Run in Pod"| Pod
+    Pod -->|"Output"| ExecAPI
+    ExecAPI -->|"Stream Output"| K8s
+    K8s --> BatchOut
+    BatchOut -->|"Adaptive Batching"| NetAdapt
+    NetAdapt -->|"Optimized Output"| SSEEndpoint
+    SSEEndpoint -->|"SSE Stream"| SSEClient
+    SSEClient -->|"Terminal Output"| FE
+    FE -->|"RTT Measurements"| HTTPClient
+    HTTPClient -->|"POST /report-rtt"| Express
+    Express --> NetAdapt
+```
+
+## Adaptive Batching System
+
+The EDURange Remote Terminal implements a sophisticated adaptive batching system to optimize terminal performance across varying network conditions. This system intelligently groups terminal output data before sending it to the client, balancing responsiveness against network efficiency.
+
+### Batching Strategy
+
+The batching system employs multiple strategies to determine when to flush data:
+
+1. **Size-based Batching**: Flushes data when the buffer reaches a configurable size threshold
+2. **Time-based Batching**: Ensures data is sent within a maximum time window
+3. **Control Sequence Detection**: Immediately flushes data containing terminal control sequences
+4. **Activity-based Adaptation**: Adjusts batching parameters based on terminal activity level
+
+```javascript
+// Terminal optimization constants
+const TERMINAL_BATCH = {
+  FLUSH_THRESHOLD: 8192,    // 8KB batch size threshold
+  MAX_DELAY: 50,            // Maximum milliseconds to hold data
+  MIN_DELAY: 12,            // Optimal milliseconds between flushes
+  HIGH_ACTIVITY_THRESHOLD: 10, // Number of rapid updates that indicates high activity
+};
+```
+
+### Control Sequence Handling
+
+A key innovation is the intelligent detection of terminal control sequences that require immediate display:
+
+```javascript
+const hasControlSequences = (data) => {
+  // Early return if no escape character is present (optimization)
+  if (data.indexOf('\x1b') === -1) return false;
+
+  // For large chunks, only test portions with ESC
+  if (data.length > 256) {
+    const chunks = data.split('\x1b');
+    if (chunks.length > 1) {
+      // ESC was found, check if it forms a control sequence
+      return chunks.some((chunk, index) =>
+        index > 0 && CONTROL_SEQUENCE_PATTERN.test('\x1b' + chunk.substring(0, 20)));
+    }
+    return false;
+  }
+
+  // Standard test for smaller chunks
+  return CONTROL_SEQUENCE_PATTERN.test(data);
+};
+```
+
+This ensures that interactive applications like vim, nano, and command-line interfaces remain responsive even while benefiting from batching for large outputs.
+
+### Input Batching
+
+On the client side, the terminal implements input batching to optimize keyboard input, particularly for text editors like vim:
+
+```javascript
+// Key input batching for better vim experience
+let inputBuffer = "";
+let inputTimeout = null;
+const INPUT_BATCH_DELAY = 5; // ms for batching keyboard input
+
+const sendBufferedInput = () => {
+  if (inputBuffer && sessionId) {
+    fetch(`/terminal/input/${sessionId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: inputBuffer })
+    }).catch(error => {
+      console.error('Error sending buffered input:', error);
+    });
+    inputBuffer = "";
+  }
+};
+```
+
+The system maintains a careful balance between batching for efficiency and immediate sending for responsiveness by identifying keys that should always be sent immediately:
+
+```javascript
+// Certain key sequences that should be sent immediately, not batched
+const IMMEDIATE_SEND_KEYS = [
+  '\x03', // Ctrl+C
+  '\x1b', // Escape (important for vim modes)
+  '\x1b[A', // Up arrow
+  // ... more special keys ...
+];
+```
+
+## RTT Network Adaptation System
+
+The RTT (Round-Trip Time) Network Adaptation System dynamically adjusts terminal behavior based on measured network conditions, ensuring optimal performance across diverse network environments from local networks to high-latency global connections.
+
+### Network Metrics Collection
+
+The system collects several network metrics:
+
+1. **RTT Measurements**: Round-trip time between server and client
+2. **Bandwidth Estimation**: Calculated based on data transfer time
+3. **Network Stability**: Variation in RTT measurements
+4. **Transmission Success Rate**: Rate of successful data transmissions
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    participant Metrics as Network Metrics Store
+
+    Server->>Client: Send data with measurement ID
+    Client->>Server: Report RTT & processing time
+    Server->>Metrics: Add RTT sample
+    Server->>Metrics: Update bandwidth estimate
+    Server->>Metrics: Calculate network stability
+
+    Note over Server,Metrics: Periodically
+    Server->>Metrics: Get optimal parameters
+    Metrics-->>Server: Return adapted values
+    Server->>Client: Apply optimized batching
+```
+
+### Adaptation Algorithm
+
+The adaptation system adjusts several parameters based on network conditions:
+
+1. **Batch Size**: Larger batches for high-latency networks, smaller for low-latency
+2. **Flush Delay**: Longer delays for unstable networks, shorter for stable ones
+3. **Activity Sensitivity**: Adjusted based on RTT variability
+
+```javascript
+/**
+ * Get the optimal delay for the current network conditions
+ * @returns {number} Optimal delay in milliseconds
+ */
+getOptimalDelay() {
+  // If adaptation is disabled or we're in fallback mode, use default
+  if (!this.adaptationEnabled || this.isUsingFallback) {
+    return DEFAULT_PARAMS.MIN_DELAY;
+  }
+
+  // If we don't have enough RTT samples, use default
+  if (this.rttSampleCount < 5) {
+    return DEFAULT_PARAMS.MIN_DELAY;
+  }
+
+  // Calculate optimal delay based on network conditions
+  let optimalDelay;
+
+  if (this.rttAvg < 20) {
+    // Excellent connection - minimal batching needed
+    optimalDelay = Math.max(5, Math.min(DEFAULT_PARAMS.MIN_DELAY, this.rttAvg * 0.5));
+  } else if (this.rttAvg < 50) {
+    // Good connection - standard batching
+    optimalDelay = DEFAULT_PARAMS.MIN_DELAY;
+  } else if (this.rttAvg < 150) {
+    // Medium latency - increase batch size
+    optimalDelay = DEFAULT_PARAMS.MIN_DELAY * 1.5;
+  } else if (this.rttAvg < 300) {
+    // High latency - larger batches to reduce overhead
+    optimalDelay = DEFAULT_PARAMS.MIN_DELAY * 2;
+  } else {
+    // Very high latency - maximum batching
+    optimalDelay = Math.min(DEFAULT_PARAMS.MAX_DELAY * 0.75, DEFAULT_PARAMS.MIN_DELAY * 3);
+  }
+
+  // Adjust for variability - more variable connections need larger batches
+  const variabilityFactor = this.rttDeviation / this.rttAvg;
+  if (variabilityFactor > 0.5) {
+    optimalDelay *= (1 + (variabilityFactor - 0.5));
+  }
+
+  // Constrain to reasonable bounds
+  return Math.max(DEFAULT_PARAMS.MIN_DELAY / 2,
+                 Math.min(DEFAULT_PARAMS.MAX_DELAY * 0.8, optimalDelay));
+}
+```
+
+### Failover Mechanism
+
+The system includes a robust failover mechanism that reverts to conservative default parameters when network conditions become unstable:
+
+```javascript
+/**
+ * Record a failed measurement attempt
+ */
+recordFailedMeasurement() {
+  this.failedMeasurements++;
+
+  // Check if we should fall back to defaults
+  if (this.failedMeasurements >= DEFAULT_PARAMS.FAILING_MEASUREMENTS_THRESHOLD) {
+    if (!this.isUsingFallback) {
+      this.isUsingFallback = true;
+      this.logAdaptation(`Falling back to default parameters after ${this.failedMeasurements} failed measurements`);
+    }
+  }
+
+  return this.isUsingFallback;
+}
+```
+
+### Performance Classification
+
+The system classifies network connections into performance categories:
+
+- **Excellent**: RTT < 50ms
+- **Good**: RTT 50-150ms
+- **Fair**: RTT 150-300ms
+- **Poor**: RTT > 300ms
+
+These classifications are used to track session quality and apply appropriate optimizations.
+
+## Server-Sent Events vs WebSockets
+
+The Remote Terminal previously used WebSockets for bidirectional communication between server and client. However, the current implementation uses Server-Sent Events (SSE) for terminal output streaming and standard HTTP requests for input. This architectural change was made for several key reasons:
+
+### Why SSE Instead of WebSockets
+
+1. **Network Compatibility**: Many corporate, school, and institutional networks block WebSocket traffic, preventing terminal connections. SSE operates over standard HTTP(S), which is rarely blocked.
+
+2. **Firewall Traversal**: SSE connections work with standard HTTP proxies and firewalls without special configuration, unlike WebSockets which often require specific proxy settings.
+
+3. **Reconnection Handling**: SSE includes built-in reconnection capabilities at the protocol level, simplifying client-side connection management.
+
+4. **HTTP/2 Compatibility**: SSE works efficiently with HTTP/2, utilizing its multiplexed connections for improved performance.
+
+5. **Simplified Architecture**: For terminal output (which is primarily server-to-client), the unidirectional nature of SSE is well-suited and reduces protocol overhead.
+
+### Implementation Details
+
+The SSE implementation for terminal output:
+
+```javascript
+// SSE endpoint for terminal output streaming
+app.get("/terminal/output/:sessionId", (req, res) => {
+  // ... authentication and setup ...
+
+  // Set headers for either HTTP/2 or HTTP/1.1 SSE
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", isHttp2 ? undefined : "keep-alive");
+
+  // Optimize for reduced latency
+  res.setHeader("X-Accel-Buffering", "no");
+
+  // ... stream setup ...
+
+  // Send data to client
+  res.write(`data: ${JSON.stringify({
+    data: payload,
+    _rttMeasure: session.networkMetrics.shouldMeasure() ? flushStartTime : undefined
+  })}\n\n`);
+});
+```
+
+HTTP requests for terminal input:
+
+```javascript
+// Process terminal input
+app.post("/terminal/input/:sessionId", async (req, res) => {
+  // ... authentication and validation ...
+
+  try {
+    // Create a unique command ID for tracking
+    session.commandCounter = (session.commandCounter || 0) + 1;
+    const commandId = `cmd_${Date.now()}_${session.commandCounter}`;
+
+    // Start tracking this command for performance metrics
+    perfMonitor.startCommandTracking(sessionId, commandId);
+
+    // Attach command ID to session for output tracking
+    session.currentCommandId = commandId;
+
+    // Send input to terminal
+    session.term.write(data);
+
+    // Respond immediately to reduce latency
+    res.json({ success: true });
+  } catch (error) {
+    // ... error handling ...
+  }
+});
+```
+
+### Adapting to Network Conditions
+
+The client automatically detects when the SSE connection is lost and implements a robust reconnection strategy:
+
+```javascript
+eventSource.onerror = (error) => {
+  console.error('EventSource error:', error);
+
+  // Only close if it's in a failed state
+  if (eventSource && eventSource.readyState === 2) { // 2 = CLOSED
+    eventSource.close();
+    eventSource = null;
+
+    term.writeln('\r\n' + STATUS_MESSAGES.DISCONNECTED.LOST);
+    updateConnectionStatusDisplay('Disconnected', 'error');
+
+    // Only attempt automatic reconnect if the page is visible
+    if (document.visibilityState === 'visible') {
+      // Attempt to reconnect after delay
+      reconnectTimeout = setTimeout(handleReconnectionAttempt,
+                                   CONNECTION_CONFIG.RECONNECT_INTERVAL_MS);
+    }
+  }
+}
+```
+
+## Performance Monitoring
+
+The Remote Terminal includes a comprehensive performance monitoring system that tracks various metrics to help optimize terminal performance:
+
+### Metrics Collection
+
+The system collects the following metrics:
+
+1. **Command Execution**: Round-trip time for commands, frequency, and distribution
+2. **Batching Performance**: Flush counts, batch sizes, and flush reasons
+3. **Network Adaptation**: Adaptation success rates and fallback events
+4. **Session Statistics**: Active sessions, connections by RTT category, and session lifecycle events
+
+```javascript
+// Performance metrics storage
+const metrics = {
+  commandExecutions: {
+    count: 0,
+    totalRoundtripTime: 0,
+    min: Infinity,
+    max: 0,
+    histogram: new Array(10).fill(0) // 0-100ms, 100-200ms, etc.
+  },
+  batching: {
+    flushCount: 0,
+    totalBytesSent: 0,
+    totalBatchSize: 0,
+    controlSequenceFlushes: 0,
+    timeoutFlushes: 0,
+    sizeThresholdFlushes: 0,
+    batchSizeHistogram: new Array(10).fill(0) // 0-1KB, 1-2KB, etc.
+  },
+  networkAdaptation: {
+    adaptationsApplied: 0,
+    fallbacksTriggered: 0,
+    measurementsReceived: 0,
+    measurementsFailed: 0
+  },
+  sessionMetrics: {
+    activeSessions: 0,
+    totalCreated: 0,
+    totalClosed: 0
+  },
+  // Timestamp
+  lastResetTime: Date.now(),
+  // Sessions by RTT ranges
+  sessionsByRtt: {
+    excellent: 0,    // < 50ms
+    good: 0,         // 50-150ms
+    fair: 0,         // 150-300ms
+    poor: 0,         // > 300ms
+    unknown: 0       // No RTT data yet
+  }
+};
+```
+
+### Reporting and Analysis
+
+The metrics are periodically logged and available through a monitoring endpoint:
+
+```javascript
+function logPerformanceMetrics() {
+  // ... calculate derived metrics ...
+
+  const report = {
+    timestamp: new Date().toISOString(),
+    timeRunning: `${Math.floor(timeRunning / 60)}m ${Math.floor(timeRunning % 60)}s`,
+    commands: {
+      total: metrics.commandExecutions.count,
+      avgRoundtripTime: Math.round(avgRoundtripTime),
+      min: metrics.commandExecutions.min === Infinity ? 0 : metrics.commandExecutions.min,
+      max: metrics.commandExecutions.max,
+      ratePerMinute: Math.round((metrics.commandExecutions.count / timeRunning) * 60)
+    },
+    batching: {
+      flushes: metrics.batching.flushCount,
+      totalBytesSent: formatBytes(metrics.batching.totalBytesSent),
+      avgBatchSize: formatBytes(avgBatchSize),
+      byReason: {
+        controlSequence: metrics.batching.controlSequenceFlushes,
+        timeout: metrics.batching.timeoutFlushes,
+        sizeThreshold: metrics.batching.sizeThresholdFlushes
+      }
+    },
+    adaptation: {
+      adaptationsApplied: metrics.networkAdaptation.adaptationsApplied,
+      fallbacksTriggered: metrics.networkAdaptation.fallbacksTriggered,
+      measurementSuccessRate: metrics.networkAdaptation.measurementsReceived > 0
+        ? (1 - metrics.networkAdaptation.measurementsFailed / metrics.networkAdaptation.measurementsReceived).toFixed(2)
+        : 'N/A'
+    },
+    sessions: {
+      active: metrics.sessionMetrics.activeSessions,
+      totalCreated: metrics.sessionMetrics.totalCreated,
+      totalClosed: metrics.sessionMetrics.totalClosed,
+      byRttCategory: {
+        excellent: metrics.sessionsByRtt.excellent,
+        good: metrics.sessionsByRtt.good,
+        fair: metrics.sessionsByRtt.fair,
+        poor: metrics.sessionsByRtt.poor,
+        unknown: metrics.sessionsByRtt.unknown
+      }
+    }
+  };
+}
+```
+
+These metrics help identify optimization opportunities and track the effectiveness of network adaptation strategies.
+
 ## Kubernetes Integration
 
 The Remote Terminal uses the Kubernetes API for direct container access:
@@ -147,21 +606,24 @@ The backend server is built with Node.js and Express, handling the following res
 
 - Serving the static frontend assets
 - Providing environment variables to the client
-- Managing terminal sessions via WebSockets
+- Managing terminal sessions via Server-Sent Events (SSE)
 - Proxying terminal commands to Kubernetes pods through the Exec API
 - Sanitizing and validating all user input
 - Applying rate limiting and security headers
 - Tracking suspicious activity for security monitoring
 - Handling reconnection and error scenarios
+- Implementing adaptive batching for network optimization
 
 ### Key Components
 
 - **Express Server**: Handles HTTP requests and serves static assets
-- **WebSocket Server**: Provides bidirectional real-time communication
+- **SSE Endpoint**: Provides unidirectional real-time output streaming
+- **HTTP API**: Processes terminal input and configuration commands
 - **Security Module**: Provides input sanitization, validation, rate limiting, and security headers
 - **Kubernetes Client**: Interfaces with the Kubernetes API to execute commands in pods
 - **Session Manager**: Tracks and manages active terminal sessions
-- **Metrics Collector**: Gathers performance and usage metrics
+- **Network Adaptation Module**: Optimizes terminal performance based on network conditions
+- **Performance Monitoring**: Gathers metrics on terminal usage and performance
 
 ### Security Features
 
@@ -218,7 +680,8 @@ The frontend client is a browser-based terminal interface built with xterm.js, p
 - Command counting
 - Terminal size display
 - Automatic reconnection
-- WebSocket-based communication with fallback mechanisms
+- Input batching for better responsiveness
+- RTT measurement for network adaptation
 
 ### Key Components
 
@@ -260,12 +723,14 @@ The terminal utilizes several xterm.js addons to enhance functionality:
 
 The terminal implements robust connection management:
 
-- **Initial Connection**: Creates a terminal session via WebSocket
-- **Bidirectional Communication**: Uses WebSockets for real-time input/output
-- **Reconnection**: Automatically attempts to reconnect if the WebSocket connection is lost
+- **Initial Connection**: Creates a terminal session via HTTP POST request
+- **Output Streaming**: Uses Server-Sent Events (SSE) for real-time terminal output
+- **Input Processing**: Sends terminal input via HTTP POST requests with batching
+- **Reconnection**: Automatically attempts to reconnect if the SSE connection is lost
 - **Visibility Change**: Reconnects when tab becomes visible after being inactive
+- **RTT Monitoring**: Measures round-trip time to optimize performance
 - **Status Indicators**: Provides visual feedback on connection status
-- **HTTP Fallback**: Automatically falls back to HTTP communication if WebSockets are unavailable
+- **Network Adaptation**: Adjusts behavior based on network conditions
 
 ## WebOS Integration
 
@@ -288,7 +753,7 @@ graph TD
     TA -->|"Get terminal URL"| CA
     TA -->|"Create window"| WA
     TA -->|"Load terminal in iframe"| RC
-    RC -->|"WebSocket connection"| RA
+    RC -->|"SSE + HTTP"| RA
     CA -->|"Provide environment variables"| RC
 ```
 
@@ -298,7 +763,7 @@ The integration flow works as follows:
 2. Terminal app fetches configuration from the WebOS Config API
 3. Terminal app creates a window using the Window API
 4. Terminal app loads the Remote Terminal client in an iframe
-5. Remote Terminal client connects to the Remote Terminal API
+5. Remote Terminal client establishes SSE connection for output and uses HTTP for input
 6. Remote Terminal API connects to the Kubernetes API
 7. User can interact with the challenge environment through the terminal
 

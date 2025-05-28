@@ -4,59 +4,15 @@ This document provides detailed information about the architecture and core comp
 
 ## Architecture Overview
 
-WebOS follows a component-based architecture with several key systems:
+The EDURange WebOS follows a component-based architecture with several key systems:
 
-```mermaid
-graph TD
-    subgraph "WebOS Core"
-        WM["Window Manager"]
-        AM["App Manager"]
-        DM["Desktop Manager"]
-        CM["Context Menu System"]
-        CReg["Component Registry"]
-    end
-
-    subgraph "API Layer"
-        CA["Config API"]
-        UH["URL Handling"]
-        DP["Database Proxy"]
-        IP["Instance Manager Proxy"]
-    end
-
-    subgraph "App Framework"
-        BA["Base App"]
-        TP["Terminal Provider"]
-        FV["Flag Verification"]
-        CP["Challenge Prompt"]
-    end
-
-    subgraph "Integration"
-        RT["Remote Terminal"]
-        IM["Instance Manager"]
-        DB["Database"]
-    end
-
-    WM <--> AM
-    AM <--> DM
-    DM <--> CM
-    AM <--> CReg
-
-    AM --> CA
-    CA --> UH
-    CA --> DP
-    CA --> IP
-
-    AM --> BA
-    BA --> TP
-    BA --> FV
-    BA --> CP
-
-    TP --> RT
-    FV --> DB
-    CP --> DB
-    IP --> IM
-    DP --> DB
-```
+<div style={{ marginTop: "2rem" }}>
+  <img
+    src="/webos-application-diagram.svg"
+    alt="EDURange WebOS Application Diagram"
+    style={{ display: "block", margin: "0 auto", maxWidth: "100%", height: "auto" }}
+  />
+</div>
 
 ### Core Components
 
