@@ -220,7 +220,7 @@ Represents questions within a challenge.
 
 ### ChallengeAppConfig
 
-Configures applications available within a challenge's WebOS environment.
+Configures applications available within a challenge's [WebOS](../Framework/WebOS/Introduction) environment.
 
 | Field | Type | Description |
 |-------|------|-------------|

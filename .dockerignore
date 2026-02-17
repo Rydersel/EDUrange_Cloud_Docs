@@ -1,1 +1,7 @@
 node_modules
+.next
+.git
+.idea
+coverage
+__tests__
+__mocks__

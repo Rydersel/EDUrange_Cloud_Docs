@@ -70,7 +70,7 @@ Components within the cluster can access the Database API in two ways:
 
 1. **Direct Internal Access**: Services running in the same Kubernetes namespace (such as the Instance Manager and Database Sync) can directly access the Database API using the internal DNS name.
 
-2. **WebOS Proxy**: For client-side components in the WebOS application, requests are proxied through the `/api/database-proxy` endpoint to avoid mixed content issues and maintain security.
+2. **WebOS Proxy**: For client-side components in the [WebOS](../Framework/WebOS/Introduction) application, requests are proxied through the `/api/database-proxy` endpoint to avoid mixed content issues and maintain security.
 
 ### Security Benefits
 
@@ -161,7 +161,7 @@ The Database Sync service is a Python application that runs continuously in the 
 
 ### Enhanced Synchronization Process
 
-1. **Polling**: Every few seconds, the sync service queries the Instance Manager API to get the current list of challenge pods in the Kubernetes cluster
+1. **Polling**: Every few seconds, the sync service queries the [Instance Manager](../Framework/Instance_Manager) API to get the current list of challenge pods in the Kubernetes cluster
 2. **Comparison**: Compares the list of pods with the challenge instances in the database
 3. **Status Updates**:
    - Updates challenge instance status (CREATING, ACTIVE, TERMINATING, TERMINATED, ERROR)

@@ -49,9 +49,9 @@ EDURange Cloud employs different connection strategies for different components:
 Most platform components connect to the database through PgBouncer:
 
 - **Dashboard**: Web interface for administrators, instructors, and students
-- **WebOS**: Browser-based desktop environment for challenges
-- **Instance Manager**: Manages challenge instances in Kubernetes
-- **Monitoring Service**: Tracks system health and metrics
+- **[WebOS](../Framework/WebOS/Introduction)**: Browser-based desktop environment for challenges
+- **[Instance Manager](../Framework/Instance_Manager)**: Manages challenge instances in Kubernetes
+- **[Monitoring Service](../Framework/Monitoring_System)**: Tracks system health and metrics
 
 These components benefit from connection pooling because:
 - They have intermittent database access patterns

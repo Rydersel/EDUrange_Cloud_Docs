@@ -1,2 +1,8 @@
 .next
 node_modules
+
+# TypeScript build info files
+*.tsbuildinfo
+
+# Memory bank - internal documentation context, never commit
+memory-bank/

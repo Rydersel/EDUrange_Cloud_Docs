@@ -204,7 +204,7 @@ The database is managed through:
 
 The database-sync service continuously:
 
-1. Retrieves challenge pod information from Kubernetes
+1. Retrieves challenge pod information from the [Instance Manager](../Framework/Instance_Manager)
 2. Updates the database to reflect the current state of running challenges
 3. Removes database entries for terminated challenge instances
 4. Ensures consistency between the Kubernetes cluster and database records

@@ -1,0 +1,42 @@
+{
+  "lightBundling": {
+    "description": "Always-enabled bundling to prevent weird loops",
+    "distanceBundling": {
+      "proximityThreshold": 100,
+      "comment": "Maximum midpoint distance for light distance-based bundling"
+    },
+    "minimumEdges": 4,
+    "comment": "Conservative distance-based bundling across all edges"
+  },
+  "aggressiveBundling": {
+    "description": "Optional heavy bundling for maximum visual reduction",
+    "categoryBundling": {
+      "minimumEdges": 5,
+      "comment": "Minimum edges from same category to bundle together"
+    },
+    "distanceBundling": {
+      "proximityThreshold": 150,
+      "comment": "Maximum midpoint distance for distance-based bundling"
+    },
+    "directionalBundling": {
+      "proximityThreshold": 120,
+      "directionToleranceRadians": 0.7854,
+      "directionToleranceDegrees": 45,
+      "comment": "Bundle edges going in similar directions within proximity"
+    }
+  },
+  "visual": {
+    "bundleStrokeMultiplier": 0.3,
+    "maxBundleStrokeWidth": 4,
+    "minBundleStrokeWidth": 2,
+    "bundleOpacityThreshold": 3,
+    "bundleOpacity": 0.9,
+    "labelCountThreshold": 6,
+    "comment": "Visual styling parameters for bundled edges"
+  },
+  "safety": {
+    "preserveIsolatedTables": true,
+    "enableDetailedLogging": true,
+    "comment": "Safety checks to prevent tables from losing all connections"
+  }
+}

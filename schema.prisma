@@ -1,0 +1,353 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String                @id @default(cuid())
+  name                 String?
+  email                String                @unique
+  emailVerified        DateTime?
+  image                String?
+  role                 UserRole              @default(STUDENT)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  accounts             Account[]
+  activityLogs         ActivityLog[]
+  challengeCompletions ChallengeCompletion[]
+  challengeInstances   ChallengeInstance[]
+  groupPoints          GroupPoints[]
+  questionAttempts     QuestionAttempt[]
+  questionCompletions  QuestionCompletion[]
+  sessions             Session[]
+  instructorGroups     CompetitionGroup[]    @relation("GroupInstructors")
+  memberOf             CompetitionGroup[]    @relation("GroupMembers")
+}
+
+model CompetitionGroup {
+  id           String                  @id @default(cuid())
+  name         String
+  description  String?
+  startDate    DateTime
+  endDate      DateTime?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  activityLogs ActivityLog[]
+  instances    ChallengeInstance[]
+  accessCodes  CompetitionAccessCode[]
+  challenges   GroupChallenge[]
+  userPoints   GroupPoints[]
+  instructors  User[]                  @relation("GroupInstructors")
+  members      User[]                  @relation("GroupMembers")
+}
+
+model GroupChallenge {
+  id                  String                @id @default(cuid())
+  points              Int
+  challengeId         String
+  groupId             String
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  completions         ChallengeCompletion[]
+  challenge           Challenge             @relation(fields: [challengeId], references: [id])
+  group               CompetitionGroup      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  questionAttempts    QuestionAttempt[]
+  questionCompletions QuestionCompletion[]
+
+  @@unique([challengeId, groupId])
+}
+
+model ChallengeCompletion {
+  id               String         @id @default(cuid())
+  userId           String
+  groupChallengeId String
+  pointsEarned     Int
+  completedAt      DateTime       @default(now())
+  groupChallenge   GroupChallenge @relation(fields: [groupChallengeId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupChallengeId])
+}
+
+model CompetitionAccessCode {
+  id           String           @id @default(cuid())
+  code         String           @unique
+  expiresAt    DateTime?
+  maxUses      Int?
+  usedCount    Int              @default(0)
+  groupId      String
+  createdAt    DateTime         @default(now())
+  createdBy    String
+  activityLogs ActivityLog[]
+  group        CompetitionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id                  String                 @id @default(cuid())
+  eventType           ActivityEventType
+  userId              String
+  challengeId         String?
+  groupId             String?
+  metadata            Json
+  timestamp           DateTime               @default(now())
+  accessCodeId        String?
+  challengeInstanceId String?
+  severity            LogSeverity            @default(INFO)
+  accessCode          CompetitionAccessCode? @relation(fields: [accessCodeId], references: [id])
+  challenge           Challenge?             @relation(fields: [challengeId], references: [id])
+  challengeInstance   ChallengeInstance?     @relation(fields: [challengeInstanceId], references: [id])
+  group               CompetitionGroup?      @relation(fields: [groupId], references: [id])
+  user                User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChallengeType {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  challenges Challenge[]
+}
+
+model ChallengeQuestion {
+  id          String               @id @default(cuid())
+  challengeId String
+  content     String
+  type        String
+  points      Int
+  answer      String?
+  order       Int
+  title       String?
+  format      String?
+  hint        String?
+  required    Boolean @default(true)
+  cdf_question_id String?
+  cdf_payload Json?
+
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  challenge   Challenge            @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  attempts    QuestionAttempt[]
+  completions QuestionCompletion[]
+
+  @@unique([challengeId, order])
+}
+
+model QuestionCompletion {
+  id               String            @id @default(cuid())
+  questionId       String
+  userId           String
+  groupChallengeId String
+  completedAt      DateTime          @default(now())
+  pointsEarned     Int
+  groupChallenge   GroupChallenge    @relation(fields: [groupChallengeId], references: [id], onDelete: Cascade)
+  question         ChallengeQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId, groupChallengeId])
+}
+
+model ChallengeAppConfig {
+  id                String     @id @default(cuid())
+  challengeId       String
+  appId             String
+  title             String
+  icon              String
+  width             Int
+  height            Int
+  screen            String
+  disabled          Boolean    @default(false)
+  favourite         Boolean    @default(false)
+  desktop_shortcut  Boolean    @default(false)
+  launch_on_startup Boolean    @default(false)
+  additional_config Json?      @default("{}")
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  challenge         Challenge  @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, appId])
+}
+
+model Challenge {
+  id                String               @id @default(cuid())
+  name              String
+  description       String?
+  difficulty        ChallengeDifficulty?
+  challengeTypeId   String
+  challengeType     ChallengeType        @relation(fields: [challengeTypeId], references: [id])
+  questions         ChallengeQuestion[]
+  appConfigs        ChallengeAppConfig[]
+  groupChallenges   GroupChallenge[]
+  activityLogs      ActivityLog[]
+  instances         ChallengeInstance[]  // Add relation to instances
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // --- CDF Fields ---
+  cdf_version       String?
+  cdf_content       Json?
+  pack_id           String?
+  pack              ChallengePack?       @relation(fields: [pack_id], references: [id])
+  pack_challenge_id String?
+
+  @@unique([pack_id, pack_challenge_id])
+}
+
+model ChallengePack {
+  id             String      @id @default(cuid())
+  name           String      // Human-readable name from pack.json
+  description    String?     // Description from pack.json
+  version        String      // Version from pack.json
+  author         String?     // Author from pack.json
+  license        String?     // License from pack.json
+  website        String?     // Website URL from pack.json
+  installed_date DateTime    @default(now()) // When the pack was installed
+  updatedAt      DateTime    @updatedAt
+
+  // Relation to challenges contained within this pack
+  challenges     Challenge[]
+}
+
+enum ChallengeStatus {
+  CREATING
+  ACTIVE
+  QUEUED
+  TERMINATING
+  TERMINATED
+  ERROR
+}
+
+model ChallengeInstance {
+  id                String           @id @default(uuid())
+  challengeId       String           // Refers to Challenge model ID now
+  userId            String
+  challengeUrl      String
+  creationTime      DateTime         @default(now())
+  status            ChallengeStatus  // Changed from String to enum type
+  terminationAttempts Int            @default(0) // Track retry attempts
+  lastStatusChange   DateTime        @default(now()) // Track timing of status changes
+  flagSecretName    String?          // Made optional
+  flag              String?          // Made optional
+  metadata          Json?            // Added for queue information
+  competitionId     String
+  k8s_instance_name String?          // Added field
+  activityLogs      ActivityLog[]
+  competition       CompetitionGroup @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge         Challenge        @relation(fields: [challengeId], references: [id])
+  
+  @@index([challengeId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model GroupPoints {
+  id        String           @id @default(cuid())
+  points    Int              @default(0)
+  userId    String
+  groupId   String
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  group     CompetitionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+model QuestionAttempt {
+  id               String            @id @default(cuid())
+  questionId       String
+  userId           String
+  groupChallengeId String
+  attemptedAt      DateTime          @default(now())
+  answer           String
+  isCorrect        Boolean
+  groupChallenge   GroupChallenge    @relation(fields: [groupChallengeId], references: [id], onDelete: Cascade)
+  question         ChallengeQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+enum ActivityEventType {
+
+  USER_REGISTERED
+  USER_LOGGED_IN
+  USER_ROLE_CHANGED
+  USER_UPDATED
+  CHALLENGE_COMPLETED
+  CHALLENGE_INSTANCE_CREATED
+  CHALLENGE_INSTANCE_DELETED
+  CHALLENGE_INSTANCE_QUEUED
+  QUESTION_ATTEMPTED
+  QUESTION_COMPLETED
+  GROUP_JOINED
+  GROUP_CREATED
+  GROUP_UPDATED
+  GROUP_LEFT
+  GROUP_DELETED
+  ACCESS_CODE_GENERATED
+  ACCESS_CODE_USED
+  ACCESS_CODE_EXPIRED
+  ACCESS_CODE_DELETED
+  ACCESS_CODE_INVALID
+  CHALLENGE_TERMINATION_INITIATED
+  SYSTEM_WARNING
+  SYSTEM_ERROR
+  SECURITY_EVENT
+  CHALLENGE_PACK_INSTALLED
+  CHALLENGE_TYPE_INSTALLED
+
+}
+
+enum LogSeverity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+enum ChallengeDifficulty {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+}
